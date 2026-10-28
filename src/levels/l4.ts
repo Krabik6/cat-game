@@ -1,28 +1,27 @@
 import { LevelBuilder } from '../sim/builder';
 
-/** 4. ビル風 — восходящий поток между домами держит только лёгкого кота. */
+/** 4. ふとん — футон подбрасывает тем выше, чем кот тяжелее. */
 export function level4() {
   const b = new LevelBuilder({
     id: 'l4',
     index: 4,
-    name: 'ビル風',
-    nameEn: 'UPDRAFT',
-    blurb: '風は軽い猫を空へ運ぶ。',
-    startWeight: 0.2,
-    targetPoints: 15,
+    name: 'ふとん',
+    nameEn: 'FUTONS',
+    blurb: 'ふとんは重いほど高く跳ねる。',
+    startWeight: 0.25,
+    targetPoints: 50,
   });
-  b.roof(700, 420).sign(240, 'ビル風は軽い猫を運ぶ', 'UPDRAFTS LIFT CATS UNDER 40%').row('kkk', 420);
-  b.vent(420, 200);
-  b.arc('kkk', b.x - 420, 300, b.x, 300, 60);
-  b.roof(420, 330).row('kk', 120).row('c', 300);
-  b.gap(120).roof(380, 380).row('kkkk', 60);
-  b.vent(480, 160);
-  b.arc('k.k.k', b.x - 480, 240, b.x, 260, 80);
-  b.roof(360, 300).row('t', 200);
-  b.gap(110).roof(460, 360).row('c.c', 100, { step: 120 });
-  b.vent(520, 180);
-  b.arc('kkkk', b.x - 520, 280, b.x, 280, 90);
-  b.roof(380, 320).row('kkk', 100);
-  b.gap(120).roof(400, 380);
-  return b.goal([0, 0.35]);
+  b.roof(900, 440).sign(200, 'ふとんは重いほど跳ねる', 'FUTON: HEAVIER = HIGHER');
+  b.row('kkkk', 300).row('c.c', 520, { step: 60 }).futonEnd();
+  b.roof(520, 260).row('kkk', 120).at('bell', 300, 120);
+  b.gap(110).roof(700, 440).checkpoint(60).row('c..c', 80, { step: 60 }).row('kkk', 330).futonEnd();
+  b.roof(460, 230).row('kkkk', 80);
+  b.gap(110).roof(640, 360).row('cc', 100, { step: 70 }).futon(300).row('kkk', 470);
+  // Над футоном посреди крыши: подбросит — бери колокольчик.
+  b.item('bell', b.x - 640 + 332, 360 - 230);
+  b.gapArc(130, 'kkk', 60, 420).roof(700, 420).checkpoint(60).row('cc', 120, { step: 70 }).futonEnd();
+  b.roof(480, 170).row('kkkk', 100).at('bell', 260, 60);
+  b.gap(110).roof(400, 300).row('t.k', 120, { step: 60 });
+  b.gap(110).roof(460, 380).row('kkk', 100);
+  return b.goal();
 }

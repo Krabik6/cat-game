@@ -8,20 +8,20 @@ export function level7() {
     name: '夜の街',
     nameEn: 'NIGHT RUN',
     blurb: '夜は速い。迷う時間はない。',
-    speed: 340,
+    speed: 320,
     startWeight: 0.3,
-    targetPoints: 36,
+    targetPoints: 50,
     night: true,
   });
-  b.roof(700, 420).row('kkk', 300).row('c', 520);
-  b.wire(420, 0.45, 'kk').roof(560, 420).row('cc', 60, { step: 90 }).futonEnd(210);
+  b.roof(700, 400).row('kkk', 300).crate(540, 0.35, 'kk');
+  b.wireRoad(640, 0.4, 'k.k.k', 'c.c').at('bell', 320, 40);
+  b.roof(620, 400).checkpoint(60).row('cc', 80, { step: 90 }).futonEnd(210);
   b.roof(460, 220).row('kkkk', 80);
-  b.gap(120).roof(380, 340).row('tt', 100, { step: 120 });
-  b.vent(460, 180);
-  b.arc('kkk', b.x - 460, 280, b.x, 280, 70);
-  b.roof(420, 320).row('c.c', 60, { step: 140 });
-  b.bridge(300, 0.5).roof(380, 320).row('kkk', 80);
-  b.gap(120).roof(400, 380).row('t', 220);
-  b.wire(480, 0.35, 'kkkk').roof(420, 380);
-  return b.goal([0.2, 0.5]);
+  b.gapArc(300, 'kkkkk', 120, 320).roof(460, 320).row('c.c', 60, { step: 140 });
+  b.bridge(300, 0.55).at('bell', 150, 26);
+  b.roof(460, 320).checkpoint(60).row('kkk', 80).crates(300, 3, 0.6, 44, 'kk');
+  b.gap(130).roof(420, 380).row('t', 120).row('kk', 260);
+  b.gap(300).roof(400, 320).at('bell', 200, 160);
+  b.gap(130).roof(460, 380).row('kkkk', 100);
+  return b.goal();
 }

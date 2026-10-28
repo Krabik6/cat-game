@@ -89,3 +89,51 @@ export const pigeonSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3
   <path d="M10 13 q5 -2 8 2" fill="none" stroke="${INK}" stroke-width="1.2"/>
   <path d="M13 20 v3 M17 20 v3" stroke="${INK}" stroke-width="1.2"/>
 </svg>`;
+
+/** 段ボール: картонный ящик со скотчем и кошачьей маркировкой. */
+export const crateSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56">
+  <rect x="2" y="2" width="52" height="52" rx="2" fill="${CSS.stone}" stroke="${INK}" stroke-width="2.4"/>
+  <rect x="22" y="2" width="12" height="52" fill="${CSS.sand}"/>
+  <line x1="22" y1="2" x2="22" y2="54" stroke="${INK}" stroke-width="1.2"/>
+  <line x1="34" y1="2" x2="34" y2="54" stroke="${INK}" stroke-width="1.2"/>
+  <line x1="2" y1="14" x2="54" y2="14" stroke="${INK}" stroke-width="1.4"/>
+  <g transform="translate(13 34)" fill="none" stroke="${INK}" stroke-width="1.5" stroke-linejoin="round">
+    <path d="M-6 3 l1.5 -7 l3 3 h3 l3 -3 l1.5 7 q0 5 -6 5 q-6 0 -6 -5 z"/>
+  </g>
+  <g transform="translate(44 36)" stroke="${INK}" stroke-width="1.6" stroke-linecap="round">
+    <line x1="0" y1="-6" x2="0" y2="5"/><line x1="-4" y1="-2" x2="0" y2="-6"/><line x1="4" y1="-2" x2="0" y2="-6"/>
+  </g>
+  <rect x="2" y="2" width="52" height="52" rx="2" fill="none" stroke="${INK}" stroke-width="2.4"/>
+</svg>`;
+
+/** 鈴: колокольчик на шнурке, как на ошейнике. */
+export const bellSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 40">
+  <path d="M18 2 q-4 0 -4 4" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M18 2 q4 0 4 4" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="18" cy="21" r="13" fill="${CSS.ink}"/>
+  <path d="M5.5 20 h25" stroke="${CSS.paper}" stroke-width="2"/>
+  <circle cx="18" cy="28" r="2.6" fill="${CSS.paper}"/>
+  <line x1="18" y1="28" x2="18" y2="34" stroke="${CSS.paper}" stroke-width="1.8"/>
+  <ellipse cx="12" cy="13.5" rx="3.6" ry="2.2" fill="${CSS.paper}" opacity="0.85" transform="rotate(-30 12 13.5)"/>
+</svg>`;
+
+/** 提灯: бумажный фонарь-чекпоинт на шесте. */
+export const lanternSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 84">
+  <rect x="16.5" y="0" width="3" height="84" fill="${INK}"/>
+  <rect x="9" y="10" width="18" height="4" rx="1" fill="${INK}"/>
+  <path d="M8 14 q-6 14 0 30 h20 q6 -16 0 -30 z" fill="${CSS.paper}" stroke="${INK}" stroke-width="2"/>
+  <g stroke="${INK}" stroke-width="1.1" fill="none">
+    <path d="M5 21 h26"/><path d="M4.5 29 h27"/><path d="M5 37 h26"/>
+  </g>
+  <rect x="9" y="44" width="18" height="4" rx="1" fill="${INK}"/>
+  <text x="18" y="33" text-anchor="middle" font-size="9" font-weight="700" font-family="sans-serif" fill="${INK}">猫</text>
+</svg>`;
+
+/** Тот же фонарь, зажжённый: кот прошёл чекпоинт. */
+export const lanternOnSvg = lanternSvg.replace(`fill="${CSS.paper}" stroke="${INK}" stroke-width="2"/>`, `fill="${CSS.ink}" stroke="${INK}" stroke-width="2"/>`).replace(`fill="${INK}">猫`, `fill="${CSS.paper}">猫`).replace(/<g stroke="#111111" stroke-width="1.1" fill="none">/, `<g stroke="${CSS.charcoal}" stroke-width="1.1" fill="none">`);
+
+/** Колокольчик для ночи: светлый на тёмном (чёрное и белое меняются местами). */
+export const bellNightSvg = bellSvg
+  .replace(/#111111/g, '@INK@')
+  .replace(/#F6F4EE/g, '#111111')
+  .replace(/@INK@/g, '#F6F4EE');

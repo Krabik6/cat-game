@@ -111,6 +111,36 @@ class SoundBank {
     this.play([{ freq: 880 + i * 220, dur: 0.16, type: 'sine', vol: 0.12 }]);
   }
 
+  /** ぴょん: воздушный прыжок — короткий «пуф» и подъём. */
+  airJump() {
+    this.play([
+      { freq: 700, to: 1500, dur: 0.1, type: 'sine', vol: 0.14 },
+      { freq: 260, to: 120, dur: 0.12, type: 'triangle', vol: 0.08 },
+    ]);
+  }
+
+  /** Ящик вдребезги. */
+  smash(weight: number) {
+    this.play([
+      { freq: 120 + weight * 30, to: 45, dur: 0.22, type: 'square', vol: 0.16 },
+      { freq: 900, to: 200, dur: 0.09, type: 'sawtooth', vol: 0.06 },
+      { freq: 520, to: 260, dur: 0.08, type: 'sawtooth', vol: 0.05, delay: 0.06 },
+    ]);
+  }
+
+  /** チリン: колокольчик. */
+  bell() {
+    this.play([
+      { freq: 1760, dur: 0.5, type: 'sine', vol: 0.1 },
+      { freq: 2637, dur: 0.35, type: 'sine', vol: 0.05 },
+      { freq: 1760, dur: 0.4, type: 'sine', vol: 0.06, delay: 0.12 },
+    ]);
+  }
+
+  checkpoint() {
+    this.play([{ freq: 660, dur: 0.08, vol: 0.08 }, { freq: 990, dur: 0.12, vol: 0.08, delay: 0.08 }]);
+  }
+
   click() {
     this.play([{ freq: 900, dur: 0.03, type: 'square', vol: 0.04 }]);
   }

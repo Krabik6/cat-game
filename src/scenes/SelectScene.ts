@@ -6,12 +6,12 @@ import { sound } from '../systems/Sound';
 import { drawStar, pillButton, setupCamera, txt } from '../ui/kit';
 
 const MECHANIC: Record<string, string> = {
-  l1: 'JUMP · EAT',
-  l2: 'WIRES ≤',
-  l3: 'FUTONS ≥',
-  l4: 'UPDRAFT ≤',
-  l5: 'SCALE ≥',
-  l6: 'ROUTES',
+  l1: 'JUMP · GROW',
+  l2: 'AIR JUMP',
+  l3: 'SMASH ≥',
+  l4: 'FUTONS ≥',
+  l5: 'WIRES ≤',
+  l6: 'SCALE ≥',
   l7: 'ALL · FAST',
   l8: 'ALL',
 };

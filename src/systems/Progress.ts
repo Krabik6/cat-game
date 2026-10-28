@@ -1,4 +1,4 @@
-const KEY = 'muchineko.progress.v2';
+const KEY = 'muchineko.progress.v3';
 
 export interface LevelProgress {
   stars: [boolean, boolean, boolean];

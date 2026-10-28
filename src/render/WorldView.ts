@@ -31,6 +31,8 @@ export class WorldView {
   private futons = new Map<number, Phaser.GameObjects.Image>();
   private bridges: BridgeView[] = [];
   private pigeons: { img: Phaser.GameObjects.Image; flown: boolean }[] = [];
+  private crates = new Map<number, Phaser.GameObjects.Image>();
+  private lanterns: Phaser.GameObjects.Image[] = [];
   private catPose = 'run0';
   private seen = new Set<number>();
   /** Объекты с горизонтальными границами: вне экрана выключаются, чтобы не рисовать лишнее. */
@@ -40,7 +42,7 @@ export class WorldView {
 
   constructor(
     private scene: Phaser.Scene,
-    private world: World,
+    public world: World,
     private theme: Theme,
   ) {
     const lv = world.level;
@@ -58,7 +60,11 @@ export class WorldView {
     const goal = lv.goal;
     if (!lv.endless) {
       scene.add.image(goal.x, goal.y + 1, 'flag').setOrigin(0.08, 1).setScale(INV).setDepth(1);
-      this.tag(goal.x + 70, goal.y - 64, `${pct(goal.band[0])}–${pct(goal.band[1])}`, 'ゴール体重');
+    }
+    for (const x of lv.checkpoints) {
+      const roof = lv.roofs.find((r) => x >= r.x && x <= r.x + r.w);
+      if (!roof) continue;
+      this.lanterns.push(scene.add.image(x, roof.y + 1, 'lantern').setOrigin(0.5, 1).setScale(INV).setDepth(1));
     }
 
     this.cat = scene.add
@@ -116,7 +122,8 @@ export class WorldView {
       this.seen.add(f.id);
       const img = s.add.image(f.x + f.w / 2, f.y + 3, 'futon').setOrigin(0.5, 1).setScale(INV).setDepth(2);
       this.futons.set(f.id, img);
-      this.tag(f.x + f.w / 2, f.y - 52, `≥${pct(futonMin(lv, f))}`, 'ふとん');
+      const min = futonMin(lv, f);
+      this.tag(f.x + f.w / 2, f.y - 52, min > 0 ? `≥${pct(min)}` : '↑↑', 'ふとん');
     }
 
     for (const w of lv.wires) {
@@ -136,9 +143,19 @@ export class WorldView {
       this.bridges.push(this.makeBridge(b));
     }
 
+    let prevCrate: { x: number; min: number } | null = null;
+    for (const k of lv.crates) {
+      if (this.crates.has(k.id)) continue;
+      const img = s.add.image(k.x, k.y + 1, 'crate').setOrigin(0, 1).setDisplaySize(k.w, k.h).setDepth(4);
+      this.crates.set(k.id, img);
+      if (!prevCrate || k.x - prevCrate.x > 70 || prevCrate.min !== k.min) this.tag(k.x + k.w / 2, k.y - k.h - 30, `≥${pct(k.min)}`, '段ボール');
+      prevCrate = k;
+    }
+
     for (const it of lv.items) {
       if (this.items.has(it.id)) continue;
-      const img = s.add.image(it.x, it.y, it.kind).setScale(INV).setDepth(5);
+      const key = it.kind === 'bell' && theme.name !== 'day' ? 'bellNight' : it.kind;
+      const img = s.add.image(it.x, it.y, key).setScale(INV).setDepth(5);
       this.items.set(it.id, img);
     }
 
@@ -224,6 +241,42 @@ export class WorldView {
     this.scene.tweens.add({ targets: img, scaleY: INV * 0.5, scaleX: INV * 1.12, duration: 70, yoyo: true, ease: 'Quad.easeOut' });
   }
 
+  crateImage(id: number) {
+    return this.crates.get(id);
+  }
+
+  /** Чекпоинт пройден: фонарь загорается. */
+  lightLantern(n: number) {
+    const img = this.lanterns[n];
+    if (!img || img.texture.key === 'lanternOn') return;
+    img.setTexture('lanternOn');
+    this.scene.tweens.add({ targets: img, angle: { from: -8, to: 0 }, duration: 500, ease: 'Elastic.easeOut' });
+  }
+
+  /** Перезапуск с чекпоинта: та же картинка, но состояние берём из сохранённого мира. */
+  setWorld(world: World) {
+    this.world = world;
+    const lv = world.level;
+    for (const it of lv.items) {
+      const img = this.items.get(it.id);
+      if (!img) continue;
+      this.scene.tweens.killTweensOf(img);
+      img.setData('eating', false).setVisible(!it.taken).setAlpha(1).setScale(INV).setPosition(it.x, it.y);
+    }
+    for (const v of this.bridges) {
+      const b = lv.bridges.find((x) => x.id === v.data.id)!;
+      v.data = b;
+      this.scene.tweens.killTweensOf([v.plank, v.needle]);
+      v.shown = b.reading !== null;
+      v.plank.setAngle(b.open ? 0 : -90);
+      v.needle.setRotation(this.dialAngle(b.reading ?? 0) + Math.PI / 2);
+    }
+    for (const k of lv.crates) this.crates.get(k.id)?.setVisible(!k.broken).setAlpha(1);
+    this.scene.tweens.killTweensOf(this.cat);
+    this.cat.setAlpha(1);
+    this.catTilt = 0;
+  }
+
   itemImage(id: number) {
     return this.items.get(id);
   }
@@ -249,12 +302,17 @@ export class WorldView {
       pair[1].x = camX - off + SKY_TILE;
     });
 
-    // Корм покачивается, съеденное прячется.
+    // Корм покачивается, съеденное прячется, спрятанное в ящике ждёт удара.
     for (const it of w.level.items) {
       const img = this.items.get(it.id)!;
       if (it.taken) {
         if (img.visible && !img.getData('eating')) img.setVisible(false);
         continue;
+      }
+      if (it.inCrate !== undefined) {
+        const open = !!w.level.crates.find((k) => k.id === it.inCrate)?.broken;
+        img.setVisible(open);
+        if (!open) continue;
       }
       img.y = it.y + Math.sin(time / 260 + it.x * 0.05) * 2;
     }
@@ -278,8 +336,8 @@ export class WorldView {
     if (this.cat.texture.key !== key) this.cat.setTexture(key);
     this.catPose = pose;
     this.cat.setPosition(c.x, c.y);
-    // Внутри шага текстур вес меняет масштаб плавно.
-    const k = 1 + (c.weight - step) * 0.5;
+    // Кот растёт вместе с хитбоксом: текстура даёт форму, масштаб — размер.
+    const k = (physics.size(c.weight) / physics.size(step)) * (0.92 + step * 0.3);
     this.cat.setScale(INV * k * this.squash.x, INV * k * this.squash.y);
     const tilt = c.grounded ? 0 : Phaser.Math.Clamp(c.vy / 55, -14, 18);
     this.catTilt = Phaser.Math.Linear(this.catTilt, tilt, 0.25);
