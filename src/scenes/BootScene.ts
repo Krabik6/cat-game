@@ -17,8 +17,15 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(PALETTE.ink).fillTriangle(42, 12, 47, 0, 52, 12).fillTriangle(52, 12, 58, 1, 62, 14);
     g.generateTexture('cat', 64, 48).clear();
 
-    g.fillStyle(PALETTE.ink).fillRect(0, 0, 32, 32);
-    g.generateTexture('block', 32, 32).destroy();
+    // カリカリ: три коричнево-серых зёрнышка.
+    g.fillStyle(PALETTE.charcoal).fillCircle(6, 14, 6).fillCircle(18, 14, 6).fillCircle(12, 5, 5);
+    g.generateTexture('kibble', 24, 20).clear();
+
+    // ねこ缶: банка с котом на этикетке.
+    g.fillStyle(PALETTE.ink).fillRoundedRect(0, 0, 36, 28, 5);
+    g.fillStyle(PALETTE.paper).fillRect(4, 7, 28, 14);
+    g.fillStyle(PALETTE.ink).fillCircle(18, 15, 4);
+    g.generateTexture('can', 36, 28).destroy();
 
     this.scene.start('Game');
   }
