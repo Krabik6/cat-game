@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { catTextures } from '../art/cat';
-import { canSvg, flagSvg, futonSvg, kibbleSvg, needleSvg, pigeonSvg, scaleSvg, toySvg } from '../art/props';
+import { bellNightSvg, bellSvg, canSvg, crateSvg, flagSvg, futonSvg, kibbleSvg, lanternOnSvg, lanternSvg, needleSvg, pigeonSvg, scaleSvg, toySvg } from '../art/props';
 import { addSvgTextures } from '../art/svg';
 import { CSS } from '../config';
 import { setupCamera, txt } from '../ui/kit';
@@ -40,6 +40,11 @@ export class BootScene extends Phaser.Scene {
           needle: needleSvg,
           flag: flagSvg,
           pigeon: pigeonSvg,
+          crate: crateSvg,
+          bell: bellSvg,
+          bellNight: bellNightSvg,
+          lantern: lanternSvg,
+          lanternOn: lanternOnSvg,
         }),
       )
       .then(() => {

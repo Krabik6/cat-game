@@ -1,4 +1,4 @@
-export type ItemKind = 'kibble' | 'can' | 'toy';
+export type ItemKind = 'kibble' | 'can' | 'toy' | 'bell';
 export type RoofStyle = 'ink' | 'stone' | 'charcoal';
 
 export interface Roof {
@@ -17,6 +17,20 @@ export interface Item {
   x: number;
   y: number;
   taken: boolean;
+  /** Спрятан в ящике с этим id: доступен, только когда ящик разбит. */
+  inCrate?: number;
+}
+
+/** 段ボール: тяжёлый кот проламывает, лёгкому надо перепрыгнуть. */
+export interface Crate {
+  id: number;
+  x: number;
+  /** Низ ящика (крыша, на которой стоит). */
+  y: number;
+  w: number;
+  h: number;
+  min: number;
+  broken: boolean;
 }
 
 /** 電線: проходимо, только если вес не больше max. */
@@ -68,7 +82,6 @@ export interface Sign {
 export interface Goal {
   x: number;
   y: number;
-  band: [number, number];
 }
 
 export interface LevelData {
@@ -86,6 +99,9 @@ export interface LevelData {
   futons: Futon[];
   vents: Vent[];
   bridges: Bridge[];
+  crates: Crate[];
+  /** Чекпоинты 提灯: x, после которого забег продолжается отсюда. */
+  checkpoints: number[];
   signs: Sign[];
   goal: Goal;
   /** Бесконечный режим: уровень дописывается по ходу. */
@@ -100,10 +116,14 @@ export type Requirement =
   | { kind: 'wire'; max: number; x: number }
   | { kind: 'vent'; max: number; x: number }
   | { kind: 'bridge'; min: number; x: number }
-  | { kind: 'futon'; min: number; x: number };
+  | { kind: 'futon'; min: number; x: number }
+  | { kind: 'crate'; min: number; x: number };
 
 export type SimEvent =
   | { type: 'jump'; weight: number }
+  | { type: 'airJump'; weight: number }
+  | { type: 'smash'; id: number; weight: number }
+  | { type: 'checkpoint'; x: number }
   | { type: 'land'; vy: number; weight: number }
   | { type: 'eat'; kind: ItemKind; id: number }
   | { type: 'bounce'; id: number; weight: number }
@@ -118,6 +138,8 @@ export interface Result {
   points: number;
   weight: number;
   distance: number;
+  bells: number;
+  bellsTotal: number;
   stars: [boolean, boolean, boolean];
 }
 

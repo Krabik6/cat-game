@@ -1,29 +1,27 @@
 import { LevelBuilder } from '../sim/builder';
 
-/** 6. ふたつの道 — лёгкий идёт верхом по проводу, тяжёлый проваливается вниз и выбирается футоном. */
+/** 6. 体重計 — мост опускается только под тяжёлым котом. */
 export function level6() {
   const b = new LevelBuilder({
     id: 'l6',
     index: 6,
-    name: 'ふたつの道',
-    nameEn: 'TWO ROADS',
-    blurb: '軽ければ上の道、重ければ下の道。',
-    startWeight: 0.25,
-    targetPoints: 30,
+    name: '体重計',
+    nameEn: 'WEIGH-IN',
+    blurb: '重ければ橋がおりる。軽ければ、ぴょん。',
+    startWeight: 0.3,
+    targetPoints: 44,
   });
-  b.roof(700, 400).row('kkkk', 200).row('c', 500);
-  b.gap(110).roof(420, 280).sign(120, '上は軽い猫の道', 'UPPER ROAD: LIGHT CATS');
-  const fork = b.x;
-  // Верхняя дорога: длинный провод, корм на нём приближает обрыв.
-  b.wire(1120, 0.35, 'k.k.k.k.k.k');
-  const merge = b.x;
-  // Нижняя дорога под проводом: консервы и футон обратно наверх.
-  b.x = fork;
-  b.roof(520, 470).row('c.c', 160, { step: 120 });
-  b.gap(100).roof(merge - fork - 620, 470).row('kk', 80).futonEnd(200);
-  b.x = merge;
-  b.roof(560, 280).row('t', 80).row('cc', 300, { step: 70 }).sign(160, 'ここで合流', 'ROADS MEET');
-  b.bridge(300, 0.45).roof(420, 280).row('kkk', 100);
-  b.gap(120).roof(400, 340).row('t.kk', 80);
-  return b.goal([0.3, 0.6]);
+  b.roof(820, 400).sign(200, '重いと橋がおりる', 'HEAVY CAT OPENS THE BRIDGE');
+  b.row('kk', 400).row('c', 520);
+  b.bridge(280, 0.4).at('bell', 140, 26);
+  b.roof(560, 400).row('kkk', 100).row('cc', 340, { step: 70 });
+  b.bridge(300, 0.6).at('bell', 150, 26);
+  b.roof(520, 400).checkpoint(60).row('kkkk', 120);
+  b.gap(130).roof(460, 340).row('t.k', 80, { step: 60 }).row('cc', 300, { step: 70 });
+  b.sign(80, 'ダメならぴょん', 'TOO LIGHT? AIR JUMP');
+  b.bridge(300, 0.5).roof(500, 340).checkpoint(60).row('kkk', 120);
+  b.crate(220, 0.55, 'cc', { w: 56, h: 56 });
+  b.bridge(300, 0.75).at('bell', 150, 26);
+  b.roof(440, 340).row('kkkk', 100);
+  return b.goal();
 }

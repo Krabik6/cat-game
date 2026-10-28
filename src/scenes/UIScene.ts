@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CSS, VIEW_H, VIEW_W } from '../config';
 import { LEVELS } from '../levels';
+import { SIM } from '../sim/constants';
 import type { LevelData, Requirement } from '../sim/types';
 import { sound } from '../systems/Sound';
 import { drawStar, pillButton, setupCamera, txt } from '../ui/kit';
@@ -17,6 +18,7 @@ const REQ_LABEL: Record<Requirement['kind'], string> = {
   vent: 'ビル風',
   bridge: '体重計',
   futon: 'ふとん',
+  crate: '段ボール',
 };
 
 /** HUD поверх игры: шкала веса с порогом ближайшего испытания, очки, прогресс, пауза и итоги. */
@@ -29,6 +31,8 @@ export class UIScene extends Phaser.Scene {
   private pctText!: Phaser.GameObjects.Text;
   private reqText!: Phaser.GameObjects.Text;
   private pointsText!: Phaser.GameObjects.Text;
+  private bellIcons: Phaser.GameObjects.Image[] = [];
+  private bellsShown = 0;
   private progG!: Phaser.GameObjects.Graphics;
   private shown = 0;
   private overlay?: Phaser.GameObjects.Container;
@@ -57,6 +61,14 @@ export class UIScene extends Phaser.Scene {
 
     this.add.image(VIEW_W - 170, 50, 'kibble').setScale(0.45);
     this.pointsText = txt(this, VIEW_W - 150, 50, '× 0', { size: 15, latin: true, spacing: 1, color: this.inkCss, origin: [0, 0.5] });
+
+    // 鈴: пустые силуэты, которые темнеют по мере сбора.
+    this.bellIcons = [];
+    this.bellsShown = 0;
+    const bells = this.level.endless ? 0 : this.level.items.filter((i) => i.kind === 'bell').length;
+    for (let i = 0; i < bells; i++) {
+      this.bellIcons.push(this.add.image(VIEW_W - 166 + i * 26, 80, night ? 'bellNight' : 'bell').setScale(0.4).setAlpha(0.22));
+    }
 
     const g = this.add.graphics().fillStyle(this.ink);
     g.fillRect(VIEW_W - 58, 40, 4.5, 20).fillRect(VIEW_W - 48, 40, 4.5, 20);
@@ -97,7 +109,7 @@ export class UIScene extends Phaser.Scene {
     ];
     if (!lv.endless) {
       items.push(
-        txt(this, cx, 336, `GOAL ${pct(lv.goal.band[0])}–${pct(lv.goal.band[1])}   ·   × ${lv.targetPoints}`, {
+        txt(this, cx, 336, `× ${lv.targetPoints}   ·   鈴 ${lv.items.filter((i) => i.kind === 'bell').length}`, {
           size: 11,
           latin: true,
           spacing: 3,
@@ -131,6 +143,12 @@ export class UIScene extends Phaser.Scene {
     const fw = Math.max(h, bw * this.shown);
     g.fillStyle(this.ink).fillRoundedRect(x, y, fw, h, h / 2);
     g.lineStyle(1.4, this.ink).strokeRoundedRect(x, y, bw, h, h / 2);
+    // Запас на ぴょん: последние 8% шкалы светлее, если прыжок в воздухе доступен.
+    const c = world.cat;
+    if (!c.airUsed && w >= SIM.airCost) {
+      const sx = x + bw * Math.max(0, this.shown - SIM.airCost);
+      g.fillStyle(night ? 0x111111 : 0xf6f4ee, c.grounded ? 0.35 : 0.6).fillRect(sx, y + 4, Math.max(2, bw * this.shown - (sx - x) - 3), h - 8);
+    }
     if (req) {
       const t = 'min' in req ? req.min : req.max;
       const tx = x + bw * t;
@@ -146,6 +164,12 @@ export class UIScene extends Phaser.Scene {
     const target = this.level.targetPoints;
     this.pointsText.setText(this.level.endless ? `× ${world.points}` : `× ${world.points} / ${target}`);
     this.pointsText.setAlpha(world.points >= target && !this.level.endless ? 1 : 0.85);
+    if (world.bells !== this.bellsShown) {
+      this.bellIcons.forEach((b, i) => b.setAlpha(i < world.bells ? 1 : 0.22));
+      const got = this.bellIcons[world.bells - 1];
+      if (world.bells > this.bellsShown && got) this.tweens.add({ targets: got, scale: { from: 0.7, to: 0.4 }, duration: 300, ease: 'Back.easeOut' });
+      this.bellsShown = world.bells;
+    }
 
     // Прогресс к финишу или метры в бесконечном режиме.
     const p = this.progG.clear();
@@ -220,7 +244,7 @@ export class UIScene extends Phaser.Scene {
       const lines = [
         { label: 'ゴール', value: result.status === 'goal' ? 'CLEAR' : `${result.distance} m`, ok: result.stars[0] },
         { label: 'カリカリ', value: `${result.points} / ${level.targetPoints}`, ok: result.stars[1] },
-        { label: '体重', value: `${pct(result.weight)}  (${pct(level.goal.band[0])}–${pct(level.goal.band[1])})`, ok: result.stars[2] },
+        { label: '鈴', value: `${result.bells} / ${result.bellsTotal}`, ok: result.stars[2] },
       ];
       result.stars.forEach((_, i) => drawStar(stars, cx - 56 + i * 56, 222, 17, false));
       result.stars.forEach((on, i) => {
@@ -257,11 +281,11 @@ export class UIScene extends Phaser.Scene {
   }
 
   /** Подсказка после забега: что помешало взять звезду. */
-  private hint({ result, level }: FinishInfo) {
-    if (result.status === 'bonk') return '壁にぶつかった。早めに跳ぶか、ふとんを使おう。';
-    if (result.status === 'fall') return result.weight > 0.6 ? '重すぎたかも。食べるものを選ぼう。' : 'もう少し長く押すと高く跳べる。';
-    if (!result.stars[2]) return result.weight > level.goal.band[1] ? 'ゴールでは重すぎた。ねこじゃらしで軽くなれる。' : 'ゴールでは軽すぎた。もう少し食べよう。';
-    if (!result.stars[1]) return 'カリカリをもっと集めよう。';
+  private hint({ result }: FinishInfo) {
+    if (result.status === 'bonk') return 'ぶつかった。もっと食べれば箱もこわせる。';
+    if (result.status === 'fall') return result.weight >= 0.08 ? '空中でもう一回タップ＝ぴょん！' : '食べておけば、空中でぴょんできる。';
+    if (!result.stars[2]) return `鈴があと${result.bellsTotal - result.bells}個。重さを使って探そう。`;
+    if (!result.stars[1]) return 'もっと食べよう。箱の中にもごはん。';
     return 'パーフェクト！';
   }
 

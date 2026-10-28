@@ -25,7 +25,7 @@ export function endlessLevel(): LevelData {
   b.roof(900, 420).row('kkkk', 420);
   const lv = b.data;
   lv.endless = true;
-  lv.goal = { x: Number.POSITIVE_INFINITY, y: 0, band: [0, 1] };
+  lv.goal = { x: Number.POSITIVE_INFINITY, y: 0 };
   lv.gen = { x: b.x, y: b.y, chunks: 0, rand: rng(Date.now() % 100000) } satisfies EndlessState;
   return lv;
 }
@@ -47,9 +47,10 @@ const CHUNKS: { weight: number; make: Chunk }[] = [
   {
     weight: 2,
     make: (b, d, r) => {
-      const max = 0.35 + r() * 0.1;
+      const max = 0.3 + r() * 0.15;
       b.roof(260, b.y).row('t', 120);
-      b.wire(320 + d * 200, max, pick(r, ['k.k', 'kkk', 'k.c', ''])).roof(300, b.y);
+      b.wireRoad(520 + d * 240, max, pick(r, ['k.k.k', 'kkk', 'k.c.k']), pick(r, ['c..c', 'cc', 'c.c']));
+      b.roof(300, b.y);
     },
   },
   {
@@ -60,13 +61,19 @@ const CHUNKS: { weight: number; make: Chunk }[] = [
     },
   },
   {
+    // Широкий промежуток: без ぴょん не перелететь.
     weight: 2,
-    make: (b, d) => {
-      b.roof(320, b.y).row('t.k', 80);
-      const top = clampY(b.y - 160);
-      b.vent(380 + d * 140, top);
-      b.arc('kkk', b.x - 380, top + 60, b.x, top + 60, 60);
-      b.roof(360, clampY(b.y - 60));
+    make: (b, d, r) => {
+      b.roof(320, b.y).row('kkk', 80);
+      const y = clampY(b.y + (r() - 0.5) * 80);
+      b.gapArc(270 + d * 50, 'kkkkk', 150, y).roof(380, y).row(pick(r, ['c', 'kk', 'k.k']), 100);
+    },
+  },
+  {
+    weight: 2,
+    make: (b, d, r) => {
+      const min = 0.3 + d * 0.3 + r() * 0.1;
+      b.roof(560, b.y).row('c.c', 80, { step: 80 }).crates(320, 1 + Math.floor(r() * 3), Math.round(min * 20) / 20, 44, pick(r, ['kk', 'c', 'kkk']));
     },
   },
   {
@@ -101,6 +108,7 @@ export function extendEndless(world: World) {
     lv.wires.push(...add.wires);
     lv.futons.push(...add.futons);
     lv.vents.push(...add.vents);
+    lv.crates.push(...add.crates);
     lv.bridges.push(...add.bridges);
     st.x = b.x;
     st.y = b.y;

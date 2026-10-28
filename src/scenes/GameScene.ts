@@ -39,6 +39,10 @@ export class GameScene extends Phaser.Scene {
   private started = false;
   private paused = false;
   private dust!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private chips!: Phaser.GameObjects.Particles.ParticleEmitter;
+  /** Мир на момент последнего чекпоинта: туда возвращаемся после падения. */
+  private saved: World | null = null;
+  misses = 0;
   /** Только для разработки: проигрывание решения бота (?replay) и ускорение (?fast=N). */
   private replay: number[] | null = null;
   private steps = 0;
@@ -73,6 +77,22 @@ export class GameScene extends Phaser.Scene {
         emitting: false,
       })
       .setDepth(9);
+
+    this.chips = this.add
+      .particles(0, 0, 'dot', {
+        tint: [0xbeb8ad, 0xe6e1d7, 0x777777],
+        lifespan: 650,
+        speed: { min: 120, max: 320 },
+        angle: { min: 200, max: 340 },
+        gravityY: 900,
+        rotate: { min: 0, max: 360 },
+        scaleX: { min: 0.3, max: 0.7 },
+        scaleY: { min: 0.15, max: 0.35 },
+        emitting: false,
+      })
+      .setDepth(9);
+    this.saved = null;
+    this.misses = 0;
 
     this.setupInput();
     this.steps = 0;
@@ -186,7 +206,11 @@ export class GameScene extends Phaser.Scene {
       case 'eat': {
         const img = this.view.itemImage(e.id);
         if (img) this.eatFx(img, e.kind);
-        if (e.kind === 'can') {
+        if (e.kind === 'bell') {
+          sound.bell();
+          this.pop('チリン', c.x + 30, c.y - 80, 17);
+          this.ring(c.x, c.y - 20, 36);
+        } else if (e.kind === 'can') {
           sound.can();
           this.pop('もぐ', c.x + 30, c.y - 70, 15);
           this.view.squashCat(1.18, 1.1, 160);
@@ -196,6 +220,31 @@ export class GameScene extends Phaser.Scene {
         } else sound.kibble();
         break;
       }
+      case 'airJump':
+        sound.airJump();
+        this.ring(c.x, c.y, 20);
+        this.pop('ぴょん', c.x - 30, c.y + 10, 15);
+        this.pop('−8%', c.x + 36, c.y - 10, 11, true);
+        this.dust.explode(5, c.x, c.y);
+        this.view.squashCat(0.85, 1.2, 140);
+        break;
+      case 'smash': {
+        const img = this.view.crateImage(e.id);
+        if (img) {
+          this.chips.explode(16, img.x + img.displayWidth / 2, img.y - img.displayHeight / 2);
+          img.setVisible(false);
+        }
+        sound.smash(e.weight);
+        this.pop('ドカン', c.x + 40, c.y - 70, 20);
+        this.cameras.main.shake(120, 0.005);
+        this.view.squashCat(1.15, 0.88, 140);
+        break;
+      }
+      case 'checkpoint':
+        this.saved = this.world.clone();
+        this.view.lightLantern(this.world.checkpoint - 1);
+        sound.checkpoint();
+        break;
       case 'bounce':
         sound.bounce(e.weight);
         this.view.bounceFuton(e.id);
@@ -253,8 +302,40 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** Расходящееся кольцо: ぴょん и колокольчик. */
+  private ring(x: number, y: number, r: number) {
+    const night = !!this.world.level.night;
+    const ring = this.add.circle(x, y, r).setStrokeStyle(1.6, night ? 0xf6f4ee : 0x111111).setDepth(9);
+    this.tweens.add({ targets: ring, scale: 1.9, alpha: 0, duration: 380, onComplete: () => ring.destroy() });
+  }
+
+  /** Падение после чекпоинта: короткая пауза и забег продолжается с фонаря. */
+  private respawn() {
+    const saved = this.saved!;
+    this.misses++;
+    this.time.delayedCall(800, () => {
+      this.world = saved.clone();
+      this.view.setWorld(this.world);
+      this.acc = 0;
+      this.input_ = { jump: false, down: false };
+      const c = this.world.cat;
+      this.pop('もう一回！', c.x + 20, c.y - 80, 18);
+      this.view.squashCat(0.7, 1.3, 260);
+    });
+  }
+
   private onFinish(result: Result) {
     const lv = this.world.level;
+    if (result.status !== 'goal' && this.saved && !lv.endless) {
+      if (result.status === 'bonk') {
+        sound.bonk();
+        this.pop('ごつん', this.world.cat.x + 20, this.world.cat.y - 50, 22);
+        this.cameras.main.shake(160, 0.006);
+      } else sound.fall();
+      this.tweens.add({ targets: this.view.cat, y: VIEW_H + 120, angle: 40, duration: 700, ease: 'Quad.easeIn' });
+      this.respawn();
+      return;
+    }
     if (result.status === 'goal') sound.goal();
     else if (result.status === 'bonk') {
       sound.bonk();

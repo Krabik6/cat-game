@@ -16,11 +16,11 @@ export class TitleScene extends Phaser.Scene {
 
     txt(this, 60, 54, 'むちねこ', { size: 64, weight: 500 });
     txt(this, 64, 136, 'MUCHI  NEKO', { size: 12, latin: true, spacing: 9, color: CSS.charcoal });
-    txt(this, 62, 168, '食べたい。でも、飛べなくなる。', { size: 18, spacing: 2 });
+    txt(this, 62, 168, '食べるほど、強くなる。', { size: 18, spacing: 2 });
     this.add.rectangle(62, 214, 36, 2, 0x111111).setOrigin(0);
 
     txt(this, VIEW_W - 320, 62, 'CONCEPT', { size: 12, latin: true, spacing: 5 });
-    ['• 食べるほど、重くなる。', '• 重さで、道が変わる。', '• ちょうどいい重さで、ゴールへ。'].forEach((l, i) =>
+    ['• 食べるほど、大きく強くなる。', '• 重さで、箱も橋も味方になる。', '• 空中ぴょんで、体重を使う。'].forEach((l, i) =>
       txt(this, VIEW_W - 320, 92 + i * 26, l, { size: 14, spacing: 2, color: CSS.charcoal }),
     );
 
@@ -28,14 +28,15 @@ export class TitleScene extends Phaser.Scene {
     const baseY = 380;
     txt(this, 60, 262, 'CAT STATE', { size: 11, latin: true, spacing: 5 });
     const states: [number, string][] = [
-      [0, '軽い'],
+      [0, 'ちび'],
       [0.5, 'ふつう'],
-      [1, '重い'],
+      [1, 'むちむち'],
     ];
     states.forEach(([w, label], i) => {
       const x = 110 + i * 150;
-      const cat = this.add.image(x, baseY, catKey(w, 'sit')).setScale(inv).setOrigin(0.46, 0.92);
-      this.tweens.add({ targets: cat, scaleY: inv * 1.03, duration: 900 + i * 120, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      const k = inv * (0.85 + w * 0.45);
+      const cat = this.add.image(x, baseY, catKey(w, 'sit')).setScale(k).setOrigin(0.46, 0.92);
+      this.tweens.add({ targets: cat, scaleY: k * 1.03, duration: 900 + i * 120, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       txt(this, x, baseY + 22, label, { size: 13, origin: [0.5, 0] });
       if (i < 2) txt(this, x + 75, baseY - 30, '→', { size: 18, latin: true, origin: [0.5, 0.5] });
     });
@@ -43,12 +44,13 @@ export class TitleScene extends Phaser.Scene {
 
     txt(this, 580, 262, 'ITEMS', { size: 11, latin: true, spacing: 5 });
     const items: [string, string, string][] = [
-      ['kibble', 'カリカリ', '+2%'],
+      ['kibble', 'カリカリ', '+2.5%'],
       ['can', 'ねこ缶', '+12%'],
-      ['toy', 'ねこじゃらし', '−20%'],
+      ['toy', 'ねこじゃらし', '−15%'],
+      ['bell', '鈴', '★'],
     ];
     items.forEach(([key, label, val], i) => {
-      const x = 625 + i * 110;
+      const x = 612 + i * 92;
       this.add.image(x, baseY - 26, key).setScale(inv * 1.5);
       txt(this, x, baseY + 22, label, { size: 12, origin: [0.5, 0] });
       txt(this, x, baseY + 42, val, { size: 11, latin: true, spacing: 1, color: CSS.gray, origin: [0.5, 0] });
