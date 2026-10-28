@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, PALETTE, RUN, SCORE, WEIGHT } from '../config';
 import { CAT_FRAME, CAT_SCALE } from '../art/cat';
 import { SKYLINE_H, SKYLINE_W } from '../art/city';
+import { saveBest } from '../systems/Best';
+import { sound } from '../systems/Sound';
 import { CatStage, Weight } from '../systems/Weight';
 import { ItemKind, LevelGenerator } from '../world/LevelGenerator';
 import { HudState, PAUSE_ZONE } from './UIScene';
@@ -79,6 +81,10 @@ export class GameScene extends Phaser.Scene {
       press();
     });
     this.input.on('pointerup', release);
+    // Свайп вниз — быстрое падение.
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (p.isDown && p.y - p.downY > 40 && p.getDuration() < 400) this.fastFall();
+    });
     const kb = this.input.keyboard!;
     for (const key of ['SPACE', 'UP', 'W']) {
       kb.on(`keydown-${key}`, (e: KeyboardEvent) => !e.repeat && press());
@@ -112,6 +118,7 @@ export class GameScene extends Phaser.Scene {
       this.jumpPressedAt = -Infinity;
       this.lastGroundedAt = -Infinity;
       this.jumpLines();
+      sound.jump(w);
     }
 
     this.animateCat(grounded, speed);
@@ -147,6 +154,7 @@ export class GameScene extends Phaser.Scene {
     this.dust.explode(Math.round(4 + heavy * 8), this.cat.x - 10, this.cat.y + (CAT_FRAME.feetY - CAT_FRAME.h / 2) * CAT_SCALE);
     this.tweens.add({ targets: this.cat, scaleY: 1 - 0.08 - heavy * 0.12, scaleX: 1.06 + heavy * 0.08, duration: 70, yoyo: true });
     if (heavy > 0.67) this.cameras.main.shake(90, 0.004 * heavy);
+    sound.land(heavy);
   }
 
   /** Штрихи «движения» под котом в момент прыжка, как на референсе. */
@@ -185,6 +193,8 @@ export class GameScene extends Phaser.Scene {
       duration: 160,
       onComplete: () => ghost.destroy(),
     });
+    if (kind === 'can') sound.can();
+    else sound.kibble();
     if (kind === 'can') this.tweens.add({ targets: this.cat, scaleX: 1.2, scaleY: 1.12, duration: 110, yoyo: true });
   }
 
@@ -200,7 +210,11 @@ export class GameScene extends Phaser.Scene {
     if (this.state !== 'running') return;
     this.state = state;
     this.physics.pause();
-    this.events.emit('finish', state, this.hudState());
+    if (state === 'goal') sound.goal();
+    else sound.fall();
+    const hud = this.hudState();
+    const newBest = saveBest(state, hud.score, hud.meters);
+    this.events.emit('finish', state, hud, newBest);
   }
 
   /** Город в три слоя параллакса. */

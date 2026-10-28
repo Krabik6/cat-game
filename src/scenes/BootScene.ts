@@ -24,7 +24,7 @@ export class BootScene extends Phaser.Scene {
       const g = this.make.graphics({}, false);
       g.fillStyle(0xffffff).fillCircle(4, 4, 4);
       g.generateTexture('dot', 8, 8).destroy();
-      this.scene.start('Game');
+      this.scene.start('Menu');
     });
   }
 }

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CSS, GAME_HEIGHT, GAME_WIDTH, PALETTE, RUN } from '../config';
+import { sound } from '../systems/Sound';
 
 export const FONT = '"Helvetica Neue", "Hiragino Sans", "Noto Sans JP", Arial, sans-serif';
 
@@ -70,6 +71,7 @@ export class UIScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => this.togglePause());
     this.input.keyboard!.on('keydown-ESC', () => this.togglePause());
+    this.input.keyboard!.on('keydown-M', () => sound.toggleMute());
     this.input.keyboard!.on('keydown-P', () => this.togglePause());
   }
 
@@ -110,13 +112,19 @@ export class UIScene extends Phaser.Scene {
       .strokeCircle(px + pw, 31, 5);
   }
 
-  private showResult(result: RunResult, s: HudState) {
+  private showResult(result: RunResult, s: HudState, newBest: boolean) {
     this.updateHud(s);
     const title = result === 'goal' ? 'ゴール！' : 'おちた…';
-    const sub = `× ${s.score}    ${s.meters} m    ${Math.round(s.weight * 100)}%`;
+    const sub = `× ${s.score}    ${s.meters} m    ${Math.round(s.weight * 100)}%${newBest ? '    NEW BEST' : ''}`;
     this.time.delayedCall(400, () => {
       this.overlay = this.makeOverlay(title, sub, () => this.retry(), 'tap to retry');
+      this.input.keyboard!.once('keydown-ESC', () => this.toMenu());
     });
+  }
+
+  private toMenu() {
+    this.scene.stop('Game');
+    this.scene.start('Menu');
   }
 
   private retry() {
@@ -137,7 +145,17 @@ export class UIScene extends Phaser.Scene {
       .text(GAME_WIDTH / 2, 300, sub, { fontFamily: FONT, fontSize: '20px', color: CSS.charcoal })
       .setOrigin(0.5)
       .setLetterSpacing(3);
-    c.add([bg, t, line, st]);
+    const menu = this.add
+      .text(GAME_WIDTH / 2, 440, 'MENU', { fontFamily: FONT, fontSize: '14px', color: CSS.ink })
+      .setOrigin(0.5)
+      .setLetterSpacing(4)
+      .setPadding(16)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', (_p: unknown, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
+        e.stopPropagation();
+        this.toMenu();
+      });
+    c.add([bg, t, line, st, menu]);
     if (hint) {
       c.add(
         this.add

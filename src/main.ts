@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { CSS, GAME_HEIGHT, GAME_WIDTH, WEIGHT } from './config';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
+import { MenuScene } from './scenes/MenuScene';
 import { UIScene } from './scenes/UIScene';
 
 const game = new Phaser.Game({
@@ -13,7 +14,11 @@ const game = new Phaser.Game({
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   physics: { default: 'arcade', arcade: { gravity: { x: 0, y: WEIGHT.gravity[0] } } },
   render: { antialias: true, roundPixels: false },
-  scene: [BootScene, GameScene, UIScene],
+  scene: [BootScene, MenuScene, GameScene, UIScene],
 });
 
 if (import.meta.env.DEV) (window as unknown as { game: Phaser.Game }).game = game;
+
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js'));
+}
