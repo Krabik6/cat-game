@@ -20,5 +20,5 @@ const game = new Phaser.Game({
 if (import.meta.env.DEV) (window as unknown as { game: Phaser.Game }).game = game;
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js'));
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => undefined));
 }
