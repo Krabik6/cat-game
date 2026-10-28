@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, RUN, WEIGHT } from '../config';
+import { drawRoof, RoofStyle } from '../art/city';
 import { Weight } from '../systems/Weight';
 
 export type ItemKind = 'kibble' | 'can';
@@ -34,10 +35,10 @@ export class LevelGenerator {
     this.lastRight -= dx;
     for (const group of [this.roofs, this.items]) {
       group.getChildren().forEach((obj) => {
-        const go = obj as Phaser.GameObjects.Rectangle;
+        const go = obj as Phaser.GameObjects.Components.Transform & Phaser.GameObjects.GameObject;
         const body = go.body as Phaser.Physics.Arcade.Body;
         body.setVelocityX(-speed);
-        if (go.x + go.displayWidth < -100) go.destroy();
+        if (go.x + body.width < -100) go.destroy();
       });
     }
     while (this.lastRight < GAME_WIDTH + 200 && !this.goalSpawned) {
@@ -61,9 +62,9 @@ export class LevelGenerator {
 
     if (ahead >= goalPx) {
       this.goalSpawned = true;
-      const roof = this.addRoof(this.lastRight + gap, y, 1400);
+      const roof = this.addRoof(this.lastRight + gap, y, 1400, true);
       roof.setData('goal', true);
-      this.addItem('can', roof.x + 300, y - 40).setData('goal', true);
+      this.addItem('can', roof.x + 360, y - 30).setData('goal', true);
       return;
     }
 
@@ -75,10 +76,14 @@ export class LevelGenerator {
     this.lastY = y;
   }
 
-  private addRoof(x: number, y: number, width: number) {
-    const roof = this.scene.add.rectangle(x, y, width, GAME_HEIGHT - y + 40, 0x111111).setOrigin(0);
+  private addRoof(x: number, y: number, width: number, goal = false) {
+    const height = GAME_HEIGHT - y + 40;
+    const style: RoofStyle = Math.random() < 0.3 ? 'concrete' : 'ink';
+    const roof = this.scene.add.graphics({ x, y });
+    drawRoof(roof, width, height, style, goal);
+    this.scene.physics.add.existing(roof);
     this.roofs.add(roof);
-    (roof.body as Phaser.Physics.Arcade.Body).setImmovable(true).setAllowGravity(false);
+    (roof.body as Phaser.Physics.Arcade.Body).setSize(width, height).setImmovable(true).setAllowGravity(false);
     roof.setData('kind', 'roof');
     this.lastRight = x + width;
     return roof;
