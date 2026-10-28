@@ -7,12 +7,15 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify": "tsx tools/verify.ts"
   },
   "dependencies": {
     "phaser": "3.90.0"
   },
   "devDependencies": {
+    "@types/node": "^22.15.21",
+    "tsx": "^4.20.6",
     "typescript": "~5.9.3",
     "vite": "6.4.5"
   }

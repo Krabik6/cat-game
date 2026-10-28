@@ -1,5 +1,8 @@
-export const GAME_WIDTH = 960;
-export const GAME_HEIGHT = 540;
+/** Логический экран в пикселях мира; рендер идёт в 2× для чёткости. */
+export const VIEW_W = 960;
+export const VIEW_H = 540;
+/** ?rs=1 — упрощённый рендер для слабых устройств и тестов. */
+export const RENDER_SCALE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('rs') === '1' ? 1 : 2;
 
 /** Палитра из референса. */
 export const PALETTE = {
@@ -20,31 +23,5 @@ export const CSS = {
   paper: '#F6F4EE',
 } as const;
 
-export const RUN = {
-  catX: 220,
-  /** Пикселей на «метр» для счётчика дистанции. */
-  pxPerMeter: 50,
-  /** Дистанция до финиша, м. */
-  goalMeters: 600,
-  /** Время, когда ещё можно прыгнуть после схода с крыши, мс. */
-  coyoteMs: 90,
-  /** Нажатие прыжка чуть раньше приземления запоминается, мс. */
-  jumpBufferMs: 120,
-} as const;
-
-/** Параметры, которые плавно меняются от лёгкого (0) к тяжёлому (1) коту. */
-export const WEIGHT = {
-  start: 0.1,
-  /** Сколько веса «сгорает» за секунду бега. */
-  burnPerSec: 0.015,
-  kibble: 0.018,
-  can: 0.14,
-  speed: [290, 230] as const,
-  jumpVelocity: [860, 560] as const,
-  gravity: [1900, 2500] as const,
-  fastFallVelocity: 1100,
-  /** Вес, под который рассчитаны самые сложные промежутки: тяжелее — можно не допрыгнуть. */
-  designWeight: 0.55,
-} as const;
-
-export const SCORE = { kibble: 1, can: 5 } as const;
+export const FONT = '"Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", "Helvetica Neue", Arial, sans-serif';
+export const FONT_LATIN = '"Jost", "Futura", "Helvetica Neue", Arial, sans-serif';

@@ -1,131 +1,170 @@
 import Phaser from 'phaser';
-import { CSS, PALETTE } from '../config';
+import { RENDER_SCALE } from '../config';
+import type { Roof } from '../sim/types';
+import type { Theme } from './theme';
 
-export const SKYLINE_W = 1280;
-export const SKYLINE_H = 360;
+/** Ширина бесшовного тайла города, единицы мира. */
+export const SKY_TILE = 1400;
+export const SKY_H = 420;
 
 type Ctx = CanvasRenderingContext2D;
 
-interface LayerStyle {
-  body: string;
-  window: string;
-  minH: number;
-  maxH: number;
-  windowChance: number;
-  extras: boolean;
+/** Простой детерминированный ГПСЧ: город одинаков при каждом запуске. */
+export function rng(seed: number) {
+  let s = seed >>> 0 || 1;
+  return () => {
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    return ((s >>> 0) % 100000) / 100000;
+  };
 }
 
-const LAYERS: LayerStyle[] = [
-  { body: CSS.sand, window: '#D8D2C6', minH: 140, maxH: 300, windowChance: 0.5, extras: false },
-  { body: CSS.stone, window: '#A8A296', minH: 90, maxH: 230, windowChance: 0.7, extras: true },
-  { body: CSS.gray, window: '#5E5E5E', minH: 50, maxH: 170, windowChance: 0.8, extras: true },
+interface LayerCfg {
+  minH: number;
+  maxH: number;
+  minW: number;
+  maxW: number;
+  windows: number;
+  props: number;
+}
+
+const LAYER_CFG: LayerCfg[] = [
+  { minH: 200, maxH: 360, minW: 60, maxW: 130, windows: 0.55, props: 0.1 },
+  { minH: 150, maxH: 300, minW: 50, maxW: 120, windows: 0.7, props: 0.25 },
+  { minH: 110, maxH: 240, minW: 50, maxW: 110, windows: 0.8, props: 0.3 },
+  { minH: 70, maxH: 170, minW: 60, maxW: 130, windows: 0.85, props: 0.3 },
 ];
 
-function windows(ctx: Ctx, x: number, top: number, w: number, color: string) {
-  const cols = Math.max(2, Math.floor((w - 12) / 12));
-  const rows = Phaser.Math.Between(2, 5);
-  const cell = 10;
+function windowGrid(ctx: Ctx, r: () => number, x: number, top: number, w: number, h: number, color: string, lit?: string) {
+  const kind = r();
+  const cell = kind < 0.5 ? 9 : 12;
+  const gap = kind < 0.5 ? 3 : 4;
+  const cols = Math.max(1, Math.floor((w - 14) / cell));
+  const rows = Math.max(1, Math.floor(Math.min(h - 24, 160) / (cell + 2)));
   const gx = x + (w - cols * cell) / 2;
-  ctx.fillStyle = color;
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) ctx.fillRect(gx + c * cell, top + 14 + r * cell, cell - 3, cell - 3);
+  for (let row = 0; row < rows; row++) {
+    for (let c = 0; c < cols; c++) {
+      ctx.fillStyle = lit && r() < 0.28 ? lit : color;
+      if (kind > 0.8) ctx.fillRect(gx + c * cell, top + 14 + row * (cell + 2), cell - gap, 3);
+      else ctx.fillRect(gx + c * cell, top + 14 + row * (cell + 2), cell - gap, cell - gap);
+    }
+  }
 }
 
 function waterTower(ctx: Ctx, x: number, top: number, color: string) {
   ctx.fillStyle = color;
-  ctx.fillRect(x - 12, top - 30, 24, 26);
+  ctx.fillRect(x - 3, top - 12, 2, 12);
+  ctx.fillRect(x + 13, top - 12, 2, 12);
+  ctx.fillRect(x - 6, top - 40, 24, 28);
   ctx.beginPath();
-  ctx.arc(x, top - 30, 12, Math.PI, 0);
+  ctx.arc(x + 6, top - 40, 12, Math.PI, 0);
   ctx.fill();
-  ctx.fillRect(x - 10, top - 6, 3, 6);
-  ctx.fillRect(x + 7, top - 6, 3, 6);
 }
 
-/** Вертикальная вывеска «むちねこ», как на референсе. */
-function sign(ctx: Ctx, x: number, top: number) {
+function antenna(ctx: Ctx, x: number, top: number, color: string, r: () => number) {
+  ctx.fillStyle = color;
+  const h = 20 + r() * 36;
+  ctx.fillRect(x, top - h, 2, h);
+  ctx.fillRect(x - 6, top - h + 8, 14, 1.5);
+  if (r() < 0.5) ctx.fillRect(x - 4, top - h + 16, 10, 1.5);
+}
+
+/** Вертикальная вывеска «むちねこ» — как на референсе. */
+function sign(ctx: Ctx, x: number, top: number, theme: Theme) {
   const w = 30;
-  const h = 112;
-  ctx.fillStyle = CSS.paper;
+  const h = 116;
+  ctx.fillStyle = theme.name === 'day' ? '#F6F4EE' : '#E6E1D7';
   ctx.fillRect(x, top, w, h);
-  ctx.strokeStyle = CSS.ink;
+  ctx.strokeStyle = '#111111';
   ctx.lineWidth = 2;
-  ctx.strokeRect(x + 3, top + 3, w - 6, h - 6);
-  ctx.fillStyle = CSS.ink;
-  ctx.font = 'bold 18px "Hiragino Sans", "Noto Sans JP", sans-serif';
+  ctx.strokeRect(x + 3.5, top + 3.5, w - 7, h - 7);
+  ctx.fillStyle = '#111111';
+  ctx.font = '700 18px "Zen Kaku Gothic New", "Hiragino Sans", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ['む', 'ち', 'ね', 'こ'].forEach((ch, i) => ctx.fillText(ch, x + w / 2, top + 18 + i * 25));
+  ['む', 'ち', 'ね', 'こ'].forEach((ch, i) => ctx.fillText(ch, x + w / 2, top + 20 + i * 25.5));
 }
 
-function drawLayer(ctx: Ctx, style: LayerStyle, index: number) {
-  let x = 0;
-  let signPlaced = index !== 2;
-  while (x < SKYLINE_W) {
-    let w = Phaser.Math.Between(50, 130);
-    if (SKYLINE_W - x < 70) w = SKYLINE_W - x; // последний дом закрывает край, чтобы тайл был бесшовным
-    const h = Phaser.Math.Between(style.minH, style.maxH);
-    const top = SKYLINE_H - h;
+function drawLayer(ctx: Ctx, theme: Theme, index: number, seed: number) {
+  const cfg = LAYER_CFG[index];
+  const style = theme.layers[index];
+  const r = rng(seed);
+  let x = -10;
+  let signDone = index !== 2;
+  while (x < SKY_TILE) {
+    let w = cfg.minW + r() * (cfg.maxW - cfg.minW);
+    if (SKY_TILE - x - w < cfg.minW) w = SKY_TILE - x + 10;
+    const h = cfg.minH + r() * (cfg.maxH - cfg.minH);
+    const top = SKY_H - h;
     ctx.fillStyle = style.body;
-    ctx.fillRect(x, top, w - 4, h);
-    if (Math.random() < style.windowChance && w > 40) windows(ctx, x, top, w - 4, style.window);
-    if (style.extras) {
-      const r = Math.random();
-      if (r < 0.12) waterTower(ctx, x + w / 2, top, style.body);
-      else if (r < 0.3) ctx.fillRect(x + w * 0.3, top - Phaser.Math.Between(16, 40), 3, 40);
-    }
-    if (!signPlaced && w > 70 && h > 140 && x > 300) {
-      sign(ctx, x + w - 46, top + 30);
-      signPlaced = true;
+    ctx.fillRect(x, top, w - 3, h);
+    // Уступ: верхний этаж уже основного.
+    if (r() < 0.3 && w > 70) ctx.fillRect(x + w * 0.2, top - 18, w * 0.5, 18);
+    if (r() < cfg.windows && w > 40) windowGrid(ctx, r, x, top, w - 3, h, style.window, style.lit);
+    const p = r();
+    if (p < cfg.props * 0.4) waterTower(ctx, x + w * 0.3, top, style.body);
+    else if (p < cfg.props) antenna(ctx, x + w * (0.2 + r() * 0.6), top, style.body, r);
+    if (!signDone && w > 70 && h > 150 && x > 500) {
+      sign(ctx, x + w - 44, top + 24, theme);
+      signDone = true;
     }
     x += w;
   }
 }
 
-export function createSkylineTextures(scene: Phaser.Scene) {
-  LAYERS.forEach((style, i) => {
-    const key = `skyline-${i}`;
+/** Текстуры четырёх слоёв города для темы, в 2× разрешении. */
+export function createSkyline(scene: Phaser.Scene, theme: Theme) {
+  const keys: string[] = [];
+  theme.layers.forEach((_, i) => {
+    const key = `sky-${theme.name}-${i}`;
+    keys.push(key);
     if (scene.textures.exists(key)) return;
-    const tex = scene.textures.createCanvas(key, SKYLINE_W, SKYLINE_H)!;
-    drawLayer(tex.getContext(), style, i);
+    const tex = scene.textures.createCanvas(key, SKY_TILE * RENDER_SCALE, SKY_H * RENDER_SCALE)!;
+    const ctx = tex.getContext();
+    ctx.scale(RENDER_SCALE, RENDER_SCALE);
+    drawLayer(ctx, theme, i, 1000 + i * 77);
     tex.refresh();
   });
+  return keys;
 }
 
-export type RoofStyle = 'ink' | 'concrete';
+/**
+ * Крыша-платформа: верх — поверхность бега; ниже фасад до низа экрана.
+ * Рисуется векторно в Graphics, координаты локальные от верхнего левого угла.
+ */
+export function drawRoof(g: Phaser.GameObjects.Graphics, roof: Roof, theme: Theme, height: number) {
+  const r = rng(roof.seed + 11);
+  const t = theme.roof;
+  const w = roof.w;
+  const body = roof.style === 'stone' ? t.stone : roof.style === 'charcoal' ? t.charcoal : t.ink;
+  const win = roof.style === 'stone' ? t.windowStone : t.window;
 
-/** Рисует крышу-платформу в локальных координатах графики: верх — поверхность, по которой бежит кот. */
-export function drawRoof(g: Phaser.GameObjects.Graphics, w: number, h: number, style: RoofStyle, goal = false) {
-  const body = style === 'ink' ? PALETTE.ink : PALETTE.charcoal;
-  const win = style === 'ink' ? PALETTE.charcoal : PALETTE.gray;
-  g.fillStyle(body).fillRect(0, 0, w, h);
-  // Парапет и тёмная полоса под ним.
-  g.fillStyle(PALETTE.ink).fillRect(-4, 0, w + 8, 8);
-  g.fillStyle(win).fillRect(0, 8, w, 3);
+  g.fillStyle(body).fillRect(0, 0, w, height);
+  // Парапет.
+  g.fillStyle(t.ink).fillRect(-3, 0, w + 6, 9);
+  g.fillStyle(roof.style === 'ink' ? t.charcoal : t.ink).fillRect(0, 9, w, 3);
 
-  // Ограждение на крыше: стойки и поручень.
-  g.fillStyle(PALETTE.charcoal);
-  g.fillRect(6, -16, w - 12, 2.5);
-  for (let x = 8; x < w - 6; x += 26) g.fillRect(x, -16, 2.5, 16);
-
-  // Сетка окон фасада.
-  const cols = Math.floor((w - 40) / 30);
-  g.fillStyle(win);
-  for (let r = 0; r < 6; r++) {
+  // Окна фасада: сетка с переплётами.
+  const cell = roof.style === 'stone' ? 26 : 30;
+  const cols = Math.floor((w - 28) / cell);
+  const ox = (w - cols * cell) / 2;
+  for (let row = 0; row < 8; row++) {
     for (let c = 0; c < cols; c++) {
-      if ((r + c) % 5 === 3) continue;
-      g.fillRect(24 + c * 30, 34 + r * 34, 16, 20);
+      if (r() < 0.12) continue;
+      const x = ox + c * cell + 4;
+      const y = 32 + row * 40;
+      const lit = t.lit !== undefined && r() < 0.35;
+      g.fillStyle(lit ? t.lit! : win).fillRect(x, y, cell - 10, 22);
+      if (roof.style === 'stone' && !lit) {
+        g.fillStyle(body).fillRect(x + (cell - 10) / 2 - 1, y, 2, 22);
+      }
     }
   }
-  // Вентиляционная будка на широких крышах.
-  if (w > 380 && !goal) {
-    g.fillStyle(PALETTE.charcoal).fillRect(w - 110, -30, 52, 30);
-    g.fillStyle(PALETTE.gray).fillRect(w - 102, -24, 36, 4).fillRect(w - 102, -16, 36, 4);
-  }
-  if (goal) {
-    // Финишный флаг.
-    g.fillStyle(PALETTE.ink).fillRect(240, -90, 4, 90);
-    g.fillStyle(PALETTE.paper).fillRect(244, -90, 46, 30);
-    g.lineStyle(2, PALETTE.ink).strokeRect(244, -90, 46, 30);
-    g.fillStyle(PALETTE.ink);
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) if ((i + j) % 2 === 0) g.fillRect(246 + i * 11, -88 + j * 13, 11, 13);
-  }
+
+  // Перила.
+  g.fillStyle(t.rail);
+  g.fillRect(4, -17, w - 8, 2.5);
+  g.fillRect(4, -9, w - 8, 1.5);
+  for (let x = 6; x < w - 4; x += 22) g.fillRect(x, -17, 2.5, 17);
 }
