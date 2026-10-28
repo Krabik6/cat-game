@@ -4,14 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#F6F4EE" />
+    <meta name="description" content="食べたい。でも、飛べなくなる。— раннер про кота, который тяжелеет от еды." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
     <title>むちねこ</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #F6F4EE; overflow: hidden; touch-action: none; }
+      html, body { margin: 0; height: 100%; background: #F6F4EE; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
       #game { width: 100vw; height: 100vh; height: 100dvh; }
+      #rotate {
+        display: none; position: fixed; inset: 0; background: #F6F4EE; color: #111111;
+        font: 16px/1.6 "Helvetica Neue", "Hiragino Sans", Arial, sans-serif; letter-spacing: 0.2em;
+        align-items: center; justify-content: center; text-align: center;
+      }
+      @media (orientation: portrait) and (max-width: 820px) { #rotate { display: flex; } }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="rotate">端末を横にしてください<br /><small>ROTATE YOUR DEVICE</small></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -21,9 +21,30 @@ export const CSS = {
 } as const;
 
 export const RUN = {
-  /** Скорость прокрутки мира, px/с. */
-  baseSpeed: 260,
   catX: 220,
-  groundY: 440,
-  gravity: 1800,
+  /** Пикселей на «метр» для счётчика дистанции. */
+  pxPerMeter: 50,
+  /** Дистанция до финиша, м. */
+  goalMeters: 600,
+  /** Время, когда ещё можно прыгнуть после схода с крыши, мс. */
+  coyoteMs: 90,
+  /** Нажатие прыжка чуть раньше приземления запоминается, мс. */
+  jumpBufferMs: 120,
 } as const;
+
+/** Параметры, которые плавно меняются от лёгкого (0) к тяжёлому (1) коту. */
+export const WEIGHT = {
+  start: 0.1,
+  /** Сколько веса «сгорает» за секунду бега. */
+  burnPerSec: 0.015,
+  kibble: 0.018,
+  can: 0.14,
+  speed: [290, 230] as const,
+  jumpVelocity: [860, 560] as const,
+  gravity: [1900, 2500] as const,
+  fastFallVelocity: 1100,
+  /** Вес, под который рассчитаны самые сложные промежутки: тяжелее — можно не допрыгнуть. */
+  designWeight: 0.55,
+} as const;
+
+export const SCORE = { kibble: 1, can: 5 } as const;

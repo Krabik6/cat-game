@@ -1,16 +1,24 @@
 import Phaser from 'phaser';
-import { CSS, GAME_HEIGHT, GAME_WIDTH, RUN } from './config';
+import { CSS, GAME_HEIGHT, GAME_WIDTH, WEIGHT } from './config';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
+import { MenuScene } from './scenes/MenuScene';
+import { UIScene } from './scenes/UIScene';
 
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
   width: GAME_WIDTH,
   height: GAME_HEIGHT,
   backgroundColor: CSS.paper,
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  physics: { default: 'arcade', arcade: { gravity: { x: 0, y: RUN.gravity } } },
+  physics: { default: 'arcade', arcade: { gravity: { x: 0, y: WEIGHT.gravity[0] } } },
   render: { antialias: true, roundPixels: false },
-  scene: [BootScene, GameScene],
+  scene: [BootScene, MenuScene, GameScene, UIScene],
 });
+
+if (import.meta.env.DEV) (window as unknown as { game: Phaser.Game }).game = game;
+
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => undefined));
+}
