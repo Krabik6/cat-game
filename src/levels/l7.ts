@@ -11,6 +11,7 @@ export function level7() {
     speed: 340,
     startWeight: 0.3,
     targetPoints: 36,
+    night: true,
   });
   b.roof(700, 420).row('kkk', 300).row('c', 520);
   b.wire(420, 0.45, 'kk').roof(560, 420).row('cc', 60, { step: 90 }).futonEnd(210);

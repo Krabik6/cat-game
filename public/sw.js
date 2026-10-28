@@ -1,5 +1,5 @@
 // Офлайн-кэш: сначала сеть для HTML, для остального — кэш с обновлением в фоне.
-const CACHE = 'muchineko-v1';
+const CACHE = 'muchineko-v2';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './manifest.webmanifest', './icon.svg'])));

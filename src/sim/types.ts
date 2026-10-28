@@ -90,6 +90,10 @@ export interface LevelData {
   goal: Goal;
   /** Бесконечный режим: уровень дописывается по ходу. */
   endless?: boolean;
+  /** Ночная палитра. */
+  night?: boolean;
+  /** Состояние генератора бесконечного режима. */
+  gen?: unknown;
 }
 
 export type Requirement =

@@ -1,170 +1,273 @@
 import Phaser from 'phaser';
-import { CSS, GAME_HEIGHT, GAME_WIDTH, PALETTE, RUN } from '../config';
+import { CSS, VIEW_H, VIEW_W } from '../config';
+import { LEVELS } from '../levels';
+import type { LevelData, Requirement } from '../sim/types';
 import { sound } from '../systems/Sound';
+import { drawStar, pillButton, setupCamera, txt } from '../ui/kit';
+import type { FinishInfo, GameScene, HudFrame } from './GameScene';
 
-export const FONT = '"Helvetica Neue", "Hiragino Sans", "Noto Sans JP", Arial, sans-serif';
+/** Доли экрана, где тап — это пауза, а не прыжок (правый верхний угол). */
+export const PAUSE_ZONE = { x: 0.88, y: 0.17 } as const;
 
-/** Состояние, которое игровая сцена передаёт в HUD каждый кадр. */
-export interface HudState {
-  weight: number;
-  score: number;
-  meters: number;
-}
+const BAR = { x: 40, y: 50, w: 220, h: 14 } as const;
+const pct = (w: number) => `${Math.round(w * 100)}%`;
 
-export type RunResult = 'dead' | 'goal';
+const REQ_LABEL: Record<Requirement['kind'], string> = {
+  wire: '電線',
+  vent: 'ビル風',
+  bridge: '体重計',
+  futon: 'ふとん',
+};
 
-const BAR = { x: 48, y: 52, w: 200, h: 14 } as const;
-/** Зона кнопки паузы: тапы в ней не считаются прыжком. */
-export const PAUSE_ZONE = { x: GAME_WIDTH - 96, y: 0, w: 96, h: 90 } as const;
-
-/** HUD поверх игры: шкала веса, счётчик корма, прогресс, пауза и итоговый экран. */
+/** HUD поверх игры: шкала веса с порогом ближайшего испытания, очки, прогресс, пауза и итоги. */
 export class UIScene extends Phaser.Scene {
-  private barFill!: Phaser.GameObjects.Graphics;
-  private percent!: Phaser.GameObjects.Text;
-  private count!: Phaser.GameObjects.Text;
-  private progress!: Phaser.GameObjects.Graphics;
+  private level!: LevelData;
+  private levelIndex: number | 'endless' = 0;
+  private ink = 0x111111;
+  private inkCss: string = CSS.ink;
+  private barG!: Phaser.GameObjects.Graphics;
+  private pctText!: Phaser.GameObjects.Text;
+  private reqText!: Phaser.GameObjects.Text;
+  private pointsText!: Phaser.GameObjects.Text;
+  private progG!: Phaser.GameObjects.Graphics;
+  private shown = 0;
   private overlay?: Phaser.GameObjects.Container;
-  private shownWeight = 0;
 
   constructor() {
     super('UI');
   }
 
+  init(data: { level: LevelData; levelIndex: number | 'endless' }) {
+    this.level = data.level;
+    this.levelIndex = data.levelIndex;
+  }
+
   create() {
+    setupCamera(this);
     this.overlay = undefined;
-    const label = { fontFamily: FONT, fontSize: '15px', color: CSS.ink };
+    this.shown = this.level.startWeight;
+    const night = !!this.level.night;
+    this.ink = night ? 0xf6f4ee : 0x111111;
+    this.inkCss = night ? CSS.paper : CSS.ink;
 
-    this.add.text(BAR.x, BAR.y - 26, 'WEIGHT', label).setLetterSpacing(3);
+    txt(this, BAR.x, BAR.y - 22, 'WEIGHT', { size: 11, latin: true, spacing: 4, color: this.inkCss });
+    this.barG = this.add.graphics();
+    this.pctText = txt(this, BAR.x, BAR.y + 22, '0%', { size: 13, latin: true, spacing: 2, color: this.inkCss });
+    this.reqText = txt(this, BAR.x + 56, BAR.y + 21, '', { size: 12, color: this.inkCss });
+
+    this.add.image(VIEW_W - 170, 50, 'kibble').setScale(0.45);
+    this.pointsText = txt(this, VIEW_W - 150, 50, '× 0', { size: 15, latin: true, spacing: 1, color: this.inkCss, origin: [0, 0.5] });
+
+    const g = this.add.graphics().fillStyle(this.ink);
+    g.fillRect(VIEW_W - 58, 40, 4.5, 20).fillRect(VIEW_W - 48, 40, 4.5, 20);
     this.add
-      .graphics()
-      .fillStyle(PALETTE.sand)
-      .fillRoundedRect(BAR.x, BAR.y, BAR.w, BAR.h, BAR.h / 2)
-      .lineStyle(1.5, PALETTE.ink)
-      .strokeRoundedRect(BAR.x, BAR.y, BAR.w, BAR.h, BAR.h / 2);
-    this.barFill = this.add.graphics();
-    this.percent = this.add.text(BAR.x, BAR.y + 24, '0%', label).setLetterSpacing(2);
+      .zone(VIEW_W - 51, 50, 70, 70)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.togglePause());
 
-    this.add.image(GAME_WIDTH - 158, 54, 'kibble');
-    this.count = this.add.text(GAME_WIDTH - 140, 45, '× 0', { ...label, fontSize: '17px' }).setLetterSpacing(1);
-
-    // Прогресс до финиша — тонкая линия по центру сверху.
-    this.progress = this.add.graphics();
-
-    this.createPauseButton();
+    this.progG = this.add.graphics();
 
     const game = this.scene.get('Game');
-    game.events.on('hud', this.updateHud, this);
-    game.events.on('finish', this.showResult, this);
+    game.events.on('hud', this.onHud, this);
+    game.events.on('finish', this.onFinish, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      game.events.off('hud', this.updateHud, this);
-      game.events.off('finish', this.showResult, this);
+      game.events.off('hud', this.onHud, this);
+      game.events.off('finish', this.onFinish, this);
+    });
+    this.intro(game);
+    const kb = this.input.keyboard!;
+    kb.on('keydown-ESC', () => this.togglePause());
+    kb.on('keydown-P', () => this.togglePause());
+    kb.on('keydown-M', () => sound.toggleMute());
+    kb.on('keydown-R', () => this.retry());
+  }
+
+  /** Заставка уровня: номер, название и одна строка о механике. */
+  private intro(game: Phaser.Scene) {
+    const lv = this.level;
+    const color = this.inkCss;
+    const cx = VIEW_W / 2;
+    const label = lv.endless ? 'ENDLESS' : `STAGE ${String(lv.index).padStart(2, '0')}`;
+    const items: Phaser.GameObjects.GameObject[] = [
+      txt(this, cx, 168, label, { size: 13, latin: true, spacing: 6, color, origin: [0.5, 0.5] }),
+      txt(this, cx, 212, lv.name, { size: 44, color, origin: [0.5, 0.5] }),
+      this.add.rectangle(cx, 246, 36, 2, this.ink),
+      txt(this, cx, 266, lv.nameEn, { size: 12, latin: true, spacing: 5, color: lv.night ? CSS.stone : CSS.gray, origin: [0.5, 0.5] }),
+      txt(this, cx, 300, lv.blurb, { size: 15, color, origin: [0.5, 0.5] }),
+    ];
+    if (!lv.endless) {
+      items.push(
+        txt(this, cx, 336, `GOAL ${pct(lv.goal.band[0])}–${pct(lv.goal.band[1])}   ·   × ${lv.targetPoints}`, {
+          size: 11,
+          latin: true,
+          spacing: 3,
+          color: lv.night ? CSS.stone : CSS.gray,
+          origin: [0.5, 0.5],
+        }),
+      );
+    }
+    game.events.once('started', () => {
+      this.tweens.add({ targets: items, alpha: 0, y: '-=10', duration: 260, onComplete: () => items.forEach((i) => i.destroy()) });
     });
   }
 
-  private createPauseButton() {
-    const cx = PAUSE_ZONE.x + PAUSE_ZONE.w / 2;
-    const g = this.add.graphics().fillStyle(PALETTE.ink);
-    g.fillRect(cx - 8, 42, 5, 22).fillRect(cx + 3, 42, 5, 22);
-    this.add
-      .zone(PAUSE_ZONE.x, PAUSE_ZONE.y, PAUSE_ZONE.w, PAUSE_ZONE.h)
-      .setOrigin(0)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.togglePause());
-    this.input.keyboard!.on('keydown-ESC', () => this.togglePause());
-    this.input.keyboard!.on('keydown-M', () => sound.toggleMute());
-    this.input.keyboard!.on('keydown-P', () => this.togglePause());
+  private onHud({ world }: HudFrame) {
+    const w = world.cat.weight;
+    this.shown = Phaser.Math.Linear(this.shown, w, 0.2);
+    const req = world.nextRequirement();
+    const g = this.barG.clear();
+    const { x, y, w: bw, h } = BAR;
+    const night = !!this.level.night;
+
+    // Коридор, в котором испытание проходимо, — светлая полоса под шкалой.
+    let ok = true;
+    if (req) {
+      const lo = 'min' in req ? req.min : 0;
+      const hi = 'max' in req ? req.max : 1;
+      ok = w >= lo - 1e-9 && w <= hi + 1e-9;
+      g.fillStyle(night ? 0x777777 : 0xbeb8ad, 0.9).fillRect(x + bw * lo, y + h + 3, bw * (hi - lo), 3);
+    }
+    g.fillStyle(night ? 0x333333 : 0xe6e1d7).fillRoundedRect(x, y, bw, h, h / 2);
+    const fw = Math.max(h, bw * this.shown);
+    g.fillStyle(this.ink).fillRoundedRect(x, y, fw, h, h / 2);
+    g.lineStyle(1.4, this.ink).strokeRoundedRect(x, y, bw, h, h / 2);
+    if (req) {
+      const t = 'min' in req ? req.min : req.max;
+      const tx = x + bw * t;
+      const blink = !ok && Math.floor(this.time.now / 220) % 2 === 0;
+      g.fillStyle(blink ? (night ? 0x111111 : 0xf6f4ee) : this.ink).fillRect(tx - 1, y - 7, 2, h + 14);
+      g.fillStyle(this.ink).fillTriangle(tx - 5, y - 11, tx + 5, y - 11, tx, y - 5);
+      const sign = 'min' in req ? '≥' : '≤';
+      this.reqText.setText(`${REQ_LABEL[req.kind]} ${sign}${pct(t)}  ${ok ? 'OK' : 'NG'}`);
+      this.reqText.setAlpha(ok ? 0.75 : blink ? 0.4 : 1);
+    } else this.reqText.setText('');
+    this.pctText.setText(pct(w));
+
+    const target = this.level.targetPoints;
+    this.pointsText.setText(this.level.endless ? `× ${world.points}` : `× ${world.points} / ${target}`);
+    this.pointsText.setAlpha(world.points >= target && !this.level.endless ? 1 : 0.85);
+
+    // Прогресс к финишу или метры в бесконечном режиме.
+    const p = this.progG.clear();
+    if (this.level.endless) return;
+    const start = this.level.roofs[0].x;
+    const len = this.level.goal.x - start;
+    const t = Phaser.Math.Clamp((world.cat.x - start) / len, 0, 1);
+    const pw = 240;
+    const px = (VIEW_W - pw) / 2;
+    p.fillStyle(night ? 0x555555 : 0xbeb8ad).fillRect(px, 30, pw, 2);
+    p.fillStyle(this.ink).fillRect(px, 30, pw * t, 2).fillCircle(px + pw * t, 31, 4);
+    p.lineStyle(1.4, this.ink).strokeCircle(px + pw, 31, 5);
   }
 
   private togglePause() {
-    if (this.overlay && !this.scene.isPaused('Game')) return; // экран итогов
-    if (this.scene.isPaused('Game')) {
-      this.overlay?.destroy();
+    const game = this.scene.get('Game') as GameScene;
+    if (this.overlay?.getData('result')) return;
+    sound.click();
+    if (this.overlay) {
+      this.overlay.destroy();
       this.overlay = undefined;
-      this.scene.resume('Game');
-    } else {
-      this.scene.pause('Game');
-      this.overlay = this.makeOverlay('PAUSE', 'tap to resume', () => this.togglePause());
+      game.setPaused(false);
+      return;
     }
+    game.setPaused(true);
+    const c = this.panel();
+    c.add(txt(this, VIEW_W / 2, 190, 'PAUSE', { size: 40, latin: true, spacing: 10, origin: [0.5, 0.5] }));
+    c.add(pillButton(this, VIEW_W / 2, 270, 'RESUME', () => this.togglePause(), { filled: true }));
+    c.add(pillButton(this, VIEW_W / 2, 316, 'RETRY', () => this.retry()));
+    c.add(pillButton(this, VIEW_W / 2, 362, 'STAGES', () => this.toStages()));
+    this.overlay = c;
   }
 
-  private updateHud(s: HudState) {
-    // Шкала догоняет значение плавно, как в референсе.
-    this.shownWeight = Phaser.Math.Linear(this.shownWeight, s.weight, 0.15);
-    const w = Math.max(BAR.h, BAR.w * this.shownWeight);
-    this.barFill.clear();
-    if (this.shownWeight > 0.005) {
-      this.barFill.fillStyle(PALETTE.ink).fillRoundedRect(BAR.x, BAR.y, w, BAR.h, BAR.h / 2);
-    }
-    this.percent.setText(`${Math.round(s.weight * 100)}%`);
-    this.count.setText(`× ${s.score}`);
-
-    const pw = 240;
-    const px = (GAME_WIDTH - pw) / 2;
-    const t = Phaser.Math.Clamp(s.meters / RUN.goalMeters, 0, 1);
-    this.progress
-      .clear()
-      .fillStyle(PALETTE.stone)
-      .fillRect(px, 30, pw, 2)
-      .fillStyle(PALETTE.ink)
-      .fillRect(px, 30, pw * t, 2)
-      .fillCircle(px + pw * t, 31, 4)
-      .lineStyle(1.5, PALETTE.ink)
-      .strokeCircle(px + pw, 31, 5);
-  }
-
-  private showResult(result: RunResult, s: HudState, newBest: boolean) {
-    this.updateHud(s);
-    const title = result === 'goal' ? 'ゴール！' : 'おちた…';
-    const sub = `× ${s.score}    ${s.meters} m    ${Math.round(s.weight * 100)}%${newBest ? '    NEW BEST' : ''}`;
-    this.time.delayedCall(400, () => {
-      this.overlay = this.makeOverlay(title, sub, () => this.retry(), 'tap to retry');
-      this.input.keyboard!.once('keydown-ESC', () => this.toMenu());
-    });
-  }
-
-  private toMenu() {
-    this.scene.stop('Game');
-    this.scene.start('Menu');
+  private panel() {
+    const c = this.add.container(0, 0).setDepth(100);
+    const bg = this.add.rectangle(0, 0, VIEW_W, VIEW_H, 0xf6f4ee, 0.92).setOrigin(0).setInteractive();
+    c.add(bg);
+    return c;
   }
 
   private retry() {
-    this.scene.get('Game').scene.restart();
-    this.scene.restart();
+    sound.click();
+    this.scene.get('Game').scene.restart({ level: this.levelIndex });
   }
 
-  private makeOverlay(title: string, sub: string, onTap: () => void, hint?: string) {
-    const c = this.add.container(0, 0);
-    const bg = this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, PALETTE.paper, 0.86)
-      .setOrigin(0)
-      .setInteractive()
-      .on('pointerdown', onTap);
-    const t = this.add.text(GAME_WIDTH / 2, 210, title, { fontFamily: FONT, fontSize: '56px', color: CSS.ink }).setOrigin(0.5);
-    const line = this.add.rectangle(GAME_WIDTH / 2, 262, 40, 2, PALETTE.ink);
-    const st = this.add
-      .text(GAME_WIDTH / 2, 300, sub, { fontFamily: FONT, fontSize: '20px', color: CSS.charcoal })
-      .setOrigin(0.5)
-      .setLetterSpacing(3);
-    const menu = this.add
-      .text(GAME_WIDTH / 2, 440, 'MENU', { fontFamily: FONT, fontSize: '14px', color: CSS.ink })
-      .setOrigin(0.5)
-      .setLetterSpacing(4)
-      .setPadding(16)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerdown', (_p: unknown, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
-        e.stopPropagation();
-        this.toMenu();
+  private toStages() {
+    sound.click();
+    this.scene.stop('Game');
+    this.scene.start('Select');
+  }
+
+  private onFinish(info: FinishInfo) {
+    const { result, level } = info;
+    const c = this.panel();
+    c.setData('result', true);
+    c.setAlpha(0);
+    this.tweens.add({ targets: c, alpha: 1, duration: 250 });
+    this.overlay = c;
+    const cx = VIEW_W / 2;
+
+    const title = result.status === 'goal' ? 'ゴール！' : result.status === 'bonk' ? 'ごつん…' : 'おちた…';
+    c.add(txt(this, cx, 96, level.endless ? 'ENDLESS' : `STAGE ${String(level.index).padStart(2, '0')}  ${level.nameEn}`, { size: 11, latin: true, spacing: 5, color: CSS.gray, origin: [0.5, 0.5] }));
+    c.add(txt(this, cx, 140, title, { size: 46, origin: [0.5, 0.5] }));
+    c.add(this.add.rectangle(cx, 178, 36, 2, 0x111111));
+
+    if (level.endless) {
+      c.add(txt(this, cx, 230, `${result.distance} m`, { size: 40, latin: true, spacing: 2, origin: [0.5, 0.5] }));
+      c.add(txt(this, cx, 270, info.newRecord ? 'NEW RECORD' : `× ${result.points}`, { size: 13, latin: true, spacing: 4, color: CSS.charcoal, origin: [0.5, 0.5] }));
+    } else {
+      const stars = this.add.graphics();
+      c.add(stars);
+      const lines = [
+        { label: 'ゴール', value: result.status === 'goal' ? 'CLEAR' : `${result.distance} m`, ok: result.stars[0] },
+        { label: 'カリカリ', value: `${result.points} / ${level.targetPoints}`, ok: result.stars[1] },
+        { label: '体重', value: `${pct(result.weight)}  (${pct(level.goal.band[0])}–${pct(level.goal.band[1])})`, ok: result.stars[2] },
+      ];
+      result.stars.forEach((_, i) => drawStar(stars, cx - 56 + i * 56, 222, 17, false));
+      result.stars.forEach((on, i) => {
+        if (!on) return;
+        this.time.delayedCall(350 + i * 260, () => {
+          drawStar(stars, cx - 56 + i * 56, 222, 17, true);
+          sound.star(i);
+          const ring = this.add.circle(cx - 56 + i * 56, 222, 18).setStrokeStyle(1.5, 0x111111).setDepth(101);
+          this.tweens.add({ targets: ring, scale: 1.8, alpha: 0, duration: 400, onComplete: () => ring.destroy() });
+        });
       });
-    c.add([bg, t, line, st, menu]);
-    if (hint) {
-      c.add(
-        this.add
-          .text(GAME_WIDTH / 2, 370, hint.toUpperCase(), { fontFamily: FONT, fontSize: '14px', color: CSS.gray })
-          .setOrigin(0.5)
-          .setLetterSpacing(4),
-      );
-      this.input.keyboard!.once('keydown-SPACE', onTap);
+      lines.forEach((l, i) => {
+        const y = 270 + i * 26;
+        c.add(txt(this, cx - 150, y, l.label, { size: 13, origin: [0, 0.5] }));
+        c.add(txt(this, cx + 120, y, l.value, { size: 13, latin: true, spacing: 1, color: CSS.charcoal, origin: [1, 0.5] }));
+        c.add(txt(this, cx + 150, y, l.ok ? '✓' : '—', { size: 14, latin: true, color: l.ok ? CSS.ink : CSS.stone, origin: [1, 0.5] }));
+      });
+      const hint = this.hint(info);
+      if (hint) c.add(txt(this, cx, 358, hint, { size: 12, color: CSS.gray, origin: [0.5, 0.5] }));
     }
-    return c;
+
+    const hasNext = typeof info.levelIndex === 'number' && info.levelIndex < LEVELS.length - 1 && result.stars[0];
+    const y = 410;
+    if (hasNext) {
+      c.add(pillButton(this, cx - 170, y, 'STAGES', () => this.toStages(), { w: 140 }));
+      c.add(pillButton(this, cx, y, 'RETRY', () => this.retry(), { w: 140 }));
+      c.add(pillButton(this, cx + 170, y, 'NEXT', () => this.next(), { w: 140, filled: true }));
+    } else {
+      c.add(pillButton(this, cx - 85, y, 'STAGES', () => this.toStages(), { w: 140 }));
+      c.add(pillButton(this, cx + 85, y, 'RETRY', () => this.retry(), { w: 140, filled: true }));
+    }
+    this.input.keyboard!.once('keydown-SPACE', () => (hasNext ? this.next() : this.retry()));
+    this.input.keyboard!.once('keydown-ENTER', () => (hasNext ? this.next() : this.retry()));
+  }
+
+  /** Подсказка после забега: что помешало взять звезду. */
+  private hint({ result, level }: FinishInfo) {
+    if (result.status === 'bonk') return '壁にぶつかった。早めに跳ぶか、ふとんを使おう。';
+    if (result.status === 'fall') return result.weight > 0.6 ? '重すぎたかも。食べるものを選ぼう。' : 'もう少し長く押すと高く跳べる。';
+    if (!result.stars[2]) return result.weight > level.goal.band[1] ? 'ゴールでは重すぎた。ねこじゃらしで軽くなれる。' : 'ゴールでは軽すぎた。もう少し食べよう。';
+    if (!result.stars[1]) return 'カリカリをもっと集めよう。';
+    return 'パーフェクト！';
+  }
+
+  private next() {
+    sound.click();
+    const i = (this.levelIndex as number) + 1;
+    this.scene.get('Game').scene.restart({ level: i });
   }
 }

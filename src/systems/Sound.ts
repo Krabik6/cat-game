@@ -17,8 +17,12 @@ class SoundBank {
 
   /** Браузеры разрешают звук только после жеста пользователя. */
   unlock() {
-    if (!this.ctx) this.ctx = new AudioContext();
-    if (this.ctx.state === 'suspended') void this.ctx.resume();
+    try {
+      if (!this.ctx) this.ctx = new AudioContext();
+      if (this.ctx.state === 'suspended') void this.ctx.resume();
+    } catch {
+      /* без звука */
+    }
   }
 
   toggleMute() {
@@ -41,7 +45,7 @@ class SoundBank {
       osc.type = t.type ?? 'triangle';
       osc.frequency.setValueAtTime(t.freq, start);
       if (t.to) osc.frequency.exponentialRampToValueAtTime(t.to, start + t.dur);
-      gain.gain.setValueAtTime(t.vol ?? 0.18, start);
+      gain.gain.setValueAtTime(t.vol ?? 0.16, start);
       gain.gain.exponentialRampToValueAtTime(0.001, start + t.dur);
       osc.connect(gain).connect(this.ctx.destination);
       osc.start(start);
@@ -49,34 +53,66 @@ class SoundBank {
     }
   }
 
-  /** Чем тяжелее кот, тем ниже звук прыжка. */
+  /** Чем тяжелее кот, тем ниже звук. */
   jump(weight: number) {
-    const base = 520 - weight * 260;
+    const base = 540 - weight * 280;
     this.play([{ freq: base, to: base * 1.8, dur: 0.12 }]);
   }
 
   kibble() {
-    this.play([{ freq: 1200 + Math.random() * 200, dur: 0.05, type: 'square', vol: 0.05 }]);
+    this.play([{ freq: 1250 + Math.random() * 200, dur: 0.045, type: 'square', vol: 0.045 }]);
   }
 
   can() {
     this.play([
-      { freq: 660, dur: 0.09, type: 'square', vol: 0.07 },
-      { freq: 990, dur: 0.14, type: 'square', vol: 0.07, delay: 0.08 },
+      { freq: 660, dur: 0.08, type: 'square', vol: 0.06 },
+      { freq: 990, dur: 0.14, type: 'square', vol: 0.06, delay: 0.07 },
     ]);
   }
 
+  toy() {
+    [900, 700, 520].forEach((f, i) => this.play([{ freq: f, dur: 0.07, type: 'sine', vol: 0.12, delay: i * 0.06 }]));
+  }
+
   land(weight: number) {
-    if (weight < 0.67) return;
-    this.play([{ freq: 120, to: 50, dur: 0.16, type: 'sine', vol: 0.35 }]);
+    if (weight < 0.6) return;
+    this.play([{ freq: 130, to: 50, dur: 0.16, type: 'sine', vol: 0.3 * weight }]);
+  }
+
+  bounce(weight: number) {
+    this.play([{ freq: 180 + weight * 60, to: 620, dur: 0.22, type: 'sine', vol: 0.22 }]);
+  }
+
+  snap() {
+    this.play([
+      { freq: 2200, to: 400, dur: 0.08, type: 'sawtooth', vol: 0.08 },
+      { freq: 300, to: 90, dur: 0.4, type: 'sine', vol: 0.16, delay: 0.05 },
+    ]);
+  }
+
+  scale(ok: boolean) {
+    if (ok) this.play([{ freq: 520, dur: 0.1, vol: 0.12 }, { freq: 780, dur: 0.18, vol: 0.12, delay: 0.1 }, { freq: 140, to: 70, dur: 0.25, type: 'sine', vol: 0.25, delay: 0.3 }]);
+    else this.play([{ freq: 300, dur: 0.12, type: 'square', vol: 0.06 }, { freq: 220, dur: 0.2, type: 'square', vol: 0.06, delay: 0.12 }]);
   }
 
   fall() {
-    this.play([{ freq: 440, to: 80, dur: 0.6, type: 'sawtooth', vol: 0.08 }]);
+    this.play([{ freq: 440, to: 80, dur: 0.6, type: 'sawtooth', vol: 0.07 }]);
+  }
+
+  bonk() {
+    this.play([{ freq: 160, to: 60, dur: 0.25, type: 'square', vol: 0.12 }]);
   }
 
   goal() {
-    [523, 659, 784, 1047].forEach((f, i) => this.play([{ freq: f, dur: 0.18, vol: 0.12, delay: i * 0.1 }]));
+    [523, 659, 784, 1047].forEach((f, i) => this.play([{ freq: f, dur: 0.18, vol: 0.11, delay: i * 0.1 }]));
+  }
+
+  star(i: number) {
+    this.play([{ freq: 880 + i * 220, dur: 0.16, type: 'sine', vol: 0.12 }]);
+  }
+
+  click() {
+    this.play([{ freq: 900, dur: 0.03, type: 'square', vol: 0.04 }]);
   }
 }
 

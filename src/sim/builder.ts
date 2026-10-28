@@ -11,6 +11,7 @@ export interface LevelMeta {
   speed?: number;
   startWeight: number;
   targetPoints: number;
+  night?: boolean;
 }
 
 /**
