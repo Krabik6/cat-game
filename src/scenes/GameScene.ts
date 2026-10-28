@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { CSS, GAME_HEIGHT, GAME_WIDTH, PALETTE, RUN, SCORE, WEIGHT } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH, PALETTE, RUN, SCORE, WEIGHT } from '../config';
 import { Weight } from '../systems/Weight';
 import { ItemKind, LevelGenerator } from '../world/LevelGenerator';
+import { HudState, PAUSE_ZONE } from './UIScene';
 
 type State = 'running' | 'dead' | 'goal';
 
@@ -15,7 +16,6 @@ export class GameScene extends Phaser.Scene {
   private score = 0;
   private lastGroundedAt = 0;
   private jumpPressedAt = -Infinity;
-  private debugText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('Game');
@@ -40,19 +40,23 @@ export class GameScene extends Phaser.Scene {
     );
 
     this.setupInput();
-    this.debugText = this.add.text(16, 12, '', { fontFamily: 'monospace', fontSize: '16px', color: CSS.ink });
+    if (!this.scene.isActive('UI')) this.scene.launch('UI');
   }
 
   private setupInput() {
     const press = () => {
-      if (this.state !== 'running') return this.scene.restart();
+      if (this.state !== 'running') return;
       this.jumpPressedAt = this.time.now;
     };
     const release = () => {
       // Короткое нажатие — низкий прыжок.
       if (this.cat.body.velocity.y < 0) this.cat.body.velocity.y *= 0.45;
     };
-    this.input.on('pointerdown', press);
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      const z = PAUSE_ZONE;
+      if (p.x >= z.x && p.x <= z.x + z.w && p.y >= z.y && p.y <= z.y + z.h) return;
+      press();
+    });
     this.input.on('pointerup', release);
     const kb = this.input.keyboard!;
     for (const key of ['SPACE', 'UP', 'W']) {
@@ -94,8 +98,7 @@ export class GameScene extends Phaser.Scene {
 
     if (this.cat.y > this.scale.height + 80 || this.cat.x < -40) this.finish('dead');
 
-    const meters = Math.floor(this.traveled / RUN.pxPerMeter);
-    this.debugText.setText(`W ${Math.round(w * 100)}%  ×${this.score}  ${meters}/${RUN.goalMeters}m  ${this.weight.stage}`);
+    this.events.emit('hud', this.hudState());
   }
 
   private fastFall() {
@@ -112,18 +115,19 @@ export class GameScene extends Phaser.Scene {
     item.destroy();
   }
 
-  private finish(state: State) {
+  private hudState(): HudState {
+    return {
+      weight: this.weight.value,
+      score: this.score,
+      meters: Math.min(RUN.goalMeters, Math.floor(this.traveled / RUN.pxPerMeter)),
+    };
+  }
+
+  private finish(state: Exclude<State, 'running'>) {
+    if (this.state !== 'running') return;
     this.state = state;
     this.physics.pause();
-    const label = state === 'goal' ? 'ゴール！' : 'おちた…';
-    this.add
-      .text(GAME_WIDTH / 2, 220, `${label}\n×${this.score}\n\ntap / space`, {
-        fontFamily: 'sans-serif',
-        fontSize: '36px',
-        color: CSS.ink,
-        align: 'center',
-      })
-      .setOrigin(0.5);
+    this.events.emit('finish', state, this.hudState());
   }
 
   /** Временный параллакс-город из прямоугольников палитры. */
